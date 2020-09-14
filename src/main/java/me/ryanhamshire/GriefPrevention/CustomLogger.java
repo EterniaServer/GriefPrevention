@@ -49,14 +49,14 @@ class CustomLogger
         this.DeleteExpiredLogs();
 
         //unless disabled, schedule recurring tasks
-        int daysToKeepLogs = GriefPrevention.instance.config_logs_daysToKeep;
+        int daysToKeepLogs = EterniaKamui.instance.config_logs_daysToKeep;
         if (daysToKeepLogs > 0)
         {
-            BukkitScheduler scheduler = GriefPrevention.instance.getServer().getScheduler();
+            BukkitScheduler scheduler = EterniaKamui.instance.getServer().getScheduler();
             final long ticksPerSecond = 20L;
             final long ticksPerDay = ticksPerSecond * 60 * 60 * 24;
-            scheduler.runTaskTimerAsynchronously(GriefPrevention.instance, new EntryWriter(), this.secondsBetweenWrites * ticksPerSecond, this.secondsBetweenWrites * ticksPerSecond);
-            scheduler.runTaskTimerAsynchronously(GriefPrevention.instance, new ExpiredLogRemover(), ticksPerDay, ticksPerDay);
+            scheduler.runTaskTimerAsynchronously(EterniaKamui.instance, new EntryWriter(), this.secondsBetweenWrites * ticksPerSecond, this.secondsBetweenWrites * ticksPerSecond);
+            scheduler.runTaskTimerAsynchronously(EterniaKamui.instance, new ExpiredLogRemover(), ticksPerDay, ticksPerDay);
         }
     }
 
@@ -65,7 +65,7 @@ class CustomLogger
     void AddEntry(String entry, CustomLogEntryTypes entryType)
     {
         //if disabled, do nothing
-        int daysToKeepLogs = GriefPrevention.instance.config_logs_daysToKeep;
+        int daysToKeepLogs = EterniaKamui.instance.config_logs_daysToKeep;
         if (daysToKeepLogs == 0) return;
 
         //if entry type is not enabled, do nothing
@@ -81,14 +81,14 @@ class CustomLogger
     private boolean isEnabledType(CustomLogEntryTypes entryType)
     {
         if (entryType == CustomLogEntryTypes.Exception) return true;
-        if (entryType == CustomLogEntryTypes.SocialActivity && !GriefPrevention.instance.config_logs_socialEnabled)
+        if (entryType == CustomLogEntryTypes.SocialActivity && !EterniaKamui.instance.config_logs_socialEnabled)
             return false;
-        if (entryType == CustomLogEntryTypes.SuspiciousActivity && !GriefPrevention.instance.config_logs_suspiciousEnabled)
+        if (entryType == CustomLogEntryTypes.SuspiciousActivity && !EterniaKamui.instance.config_logs_suspiciousEnabled)
             return false;
-        if (entryType == CustomLogEntryTypes.AdminActivity && !GriefPrevention.instance.config_logs_adminEnabled)
+        if (entryType == CustomLogEntryTypes.AdminActivity && !EterniaKamui.instance.config_logs_adminEnabled)
             return false;
-        if (entryType == CustomLogEntryTypes.Debug && !GriefPrevention.instance.config_logs_debugEnabled) return false;
-        if (entryType == CustomLogEntryTypes.MutedChat && !GriefPrevention.instance.config_logs_mutedChatEnabled)
+        if (entryType == CustomLogEntryTypes.Debug && !EterniaKamui.instance.config_logs_debugEnabled) return false;
+        if (entryType == CustomLogEntryTypes.MutedChat && !EterniaKamui.instance.config_logs_mutedChatEnabled)
             return false;
 
         return true;
@@ -128,7 +128,7 @@ class CustomLogger
             File[] files = logFolder.listFiles();
 
             //delete any created before x days ago
-            int daysToKeepLogs = GriefPrevention.instance.config_logs_daysToKeep;
+            int daysToKeepLogs = EterniaKamui.instance.config_logs_daysToKeep;
             Calendar expirationBoundary = Calendar.getInstance();
             expirationBoundary.add(Calendar.DATE, -daysToKeepLogs);
             for (int i = 0; i < files.length; i++)
@@ -156,7 +156,7 @@ class CustomLogger
                 catch (NumberFormatException e)
                 {
                     //throw this away - effectively ignoring any files without the correct filename format
-                    GriefPrevention.AddLogEntry("Ignoring an unexpected file in the abridged logs folder: " + file.getName(), CustomLogEntryTypes.Debug, true);
+                    EterniaKamui.AddLogEntry("Ignoring an unexpected file in the abridged logs folder: " + file.getName(), CustomLogEntryTypes.Debug, true);
                 }
             }
         }

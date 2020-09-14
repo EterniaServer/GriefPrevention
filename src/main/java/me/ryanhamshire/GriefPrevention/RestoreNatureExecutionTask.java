@@ -73,7 +73,7 @@ class RestoreNatureExecutionTask implements Runnable
                     Block currentBlock = blockUpdate.location.getBlock();
                     if (blockUpdate.typeId != currentBlock.getType() || !blockUpdate.data.equals(currentBlock.getBlockData()))
                     {
-                        Claim claim = GriefPrevention.instance.dataStore.getClaimAt(blockUpdate.location, false, cachedClaim);
+                        Claim claim = EterniaKamui.instance.dataStore.getClaimAt(blockUpdate.location, false, cachedClaim);
                         if (claim != null)
                         {
                             cachedClaim = claim;
@@ -103,7 +103,7 @@ class RestoreNatureExecutionTask implements Runnable
             if (!(entity instanceof Player || entity instanceof Animals))
             {
                 //hanging entities (paintings, item frames) are protected when they're in land claims
-                if (!(entity instanceof Hanging) || GriefPrevention.instance.dataStore.getClaimAt(entity.getLocation(), false, null) == null)
+                if (!(entity instanceof Hanging) || EterniaKamui.instance.dataStore.getClaimAt(entity.getLocation(), false, null) == null)
                 {
                     //everything else is removed
                     entity.remove();

@@ -42,7 +42,7 @@ public class Visualization
     //sends a visualization to a player
     public static void Apply(Player player, Visualization visualization)
     {
-        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = EterniaKamui.instance.dataStore.getPlayerData(player.getUniqueId());
 
         //if he has any current visualization, clear it first
         if (playerData.currentVisualization != null)
@@ -53,7 +53,7 @@ public class Visualization
         //if he's online, create a task to send him the visualization
         if (player.isOnline() && visualization.elements.size() > 0 && visualization.elements.get(0).location.getWorld().equals(player.getWorld()))
         {
-            GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, new VisualizationApplicationTask(player, playerData, visualization), 1L);
+            EterniaKamui.instance.getServer().getScheduler().scheduleSyncDelayedTask(EterniaKamui.instance, new VisualizationApplicationTask(player, playerData, visualization), 1L);
         }
     }
 
@@ -63,7 +63,7 @@ public class Visualization
     {
         if (!player.isOnline()) return;
 
-        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = EterniaKamui.instance.dataStore.getPlayerData(player.getUniqueId());
 
         Visualization visualization = playerData.currentVisualization;
 

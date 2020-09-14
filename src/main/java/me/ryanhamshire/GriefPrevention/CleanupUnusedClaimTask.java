@@ -46,40 +46,40 @@ class CleanupUnusedClaimTask implements Runnable
 
         //determine area of the default chest claim
         int areaOfDefaultClaim = 0;
-        if (GriefPrevention.instance.config_claims_automaticClaimsForNewPlayersRadius >= 0)
+        if (EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius >= 0)
         {
-            areaOfDefaultClaim = (int) Math.pow(GriefPrevention.instance.config_claims_automaticClaimsForNewPlayersRadius * 2 + 1, 2);
+            areaOfDefaultClaim = (int) Math.pow(EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius * 2 + 1, 2);
         }
 
         //if this claim is a chest claim and those are set to expire
-        if (claim.getArea() <= areaOfDefaultClaim && GriefPrevention.instance.config_claims_chestClaimExpirationDays > 0)
+        if (claim.getArea() <= areaOfDefaultClaim && EterniaKamui.instance.config_claims_chestClaimExpirationDays > 0)
         {
             //if the owner has been gone at least a week, and if he has ONLY the new player claim, it will be removed
             Calendar sevenDaysAgo = Calendar.getInstance();
-            sevenDaysAgo.add(Calendar.DATE, -GriefPrevention.instance.config_claims_chestClaimExpirationDays);
+            sevenDaysAgo.add(Calendar.DATE, -EterniaKamui.instance.config_claims_chestClaimExpirationDays);
             boolean newPlayerClaimsExpired = sevenDaysAgo.getTime().after(new Date(ownerInfo.getLastPlayed()));
             if (newPlayerClaimsExpired && ownerData.getClaims().size() == 1)
             {
                 if (expireEventCanceled())
                     return;
                 claim.removeSurfaceFluids(null);
-                GriefPrevention.instance.dataStore.deleteClaim(claim, true, true);
+                EterniaKamui.instance.dataStore.deleteClaim(claim, true, true);
 
                 //if configured to do so, restore the land to natural
-                if (GriefPrevention.instance.creativeRulesApply(claim.getLesserBoundaryCorner()) || GriefPrevention.instance.config_claims_survivalAutoNatureRestoration)
+                if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()) || EterniaKamui.instance.config_claims_survivalAutoNatureRestoration)
                 {
-                    GriefPrevention.instance.restoreClaim(claim, 0);
+                    EterniaKamui.instance.restoreClaim(claim, 0);
                 }
 
-                GriefPrevention.AddLogEntry(" " + claim.getOwnerName() + "'s new player claim expired.", CustomLogEntryTypes.AdminActivity);
+                EterniaKamui.AddLogEntry(" " + claim.getOwnerName() + "'s new player claim expired.", CustomLogEntryTypes.AdminActivity);
             }
         }
 
         //if configured to always remove claims after some inactivity period without exceptions...
-        else if (GriefPrevention.instance.config_claims_expirationDays > 0)
+        else if (EterniaKamui.instance.config_claims_expirationDays > 0)
         {
             Calendar earliestPermissibleLastLogin = Calendar.getInstance();
-            earliestPermissibleLastLogin.add(Calendar.DATE, -GriefPrevention.instance.config_claims_expirationDays);
+            earliestPermissibleLastLogin.add(Calendar.DATE, -EterniaKamui.instance.config_claims_expirationDays);
 
             if (earliestPermissibleLastLogin.getTime().after(new Date(ownerInfo.getLastPlayed())))
             {
@@ -93,20 +93,20 @@ class CleanupUnusedClaimTask implements Runnable
                 }
 
                 //delete them
-                GriefPrevention.instance.dataStore.deleteClaimsForPlayer(claim.ownerID, true);
-                GriefPrevention.AddLogEntry(" All of " + claim.getOwnerName() + "'s claims have expired.", CustomLogEntryTypes.AdminActivity);
+                EterniaKamui.instance.dataStore.deleteClaimsForPlayer(claim.ownerID, true);
+                EterniaKamui.AddLogEntry(" All of " + claim.getOwnerName() + "'s claims have expired.", CustomLogEntryTypes.AdminActivity);
 
                 for (int i = 0; i < claims.size(); i++)
                 {
                     //if configured to do so, restore the land to natural
-                    if (GriefPrevention.instance.creativeRulesApply(claims.get(i).getLesserBoundaryCorner()) || GriefPrevention.instance.config_claims_survivalAutoNatureRestoration)
+                    if (EterniaKamui.instance.creativeRulesApply(claims.get(i).getLesserBoundaryCorner()) || EterniaKamui.instance.config_claims_survivalAutoNatureRestoration)
                     {
-                        GriefPrevention.instance.restoreClaim(claims.get(i), 0);
+                        EterniaKamui.instance.restoreClaim(claims.get(i), 0);
                     }
                 }
             }
         }
-        else if (GriefPrevention.instance.config_claims_unusedClaimExpirationDays > 0 && GriefPrevention.instance.creativeRulesApply(claim.getLesserBoundaryCorner()))
+        else if (EterniaKamui.instance.config_claims_unusedClaimExpirationDays > 0 && EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()))
         {
             //avoid scanning large claims and administrative claims
             if (claim.isAdminClaim() || claim.getWidth() > 25 || claim.getHeight() > 25) return;
@@ -120,17 +120,17 @@ class CleanupUnusedClaimTask implements Runnable
             {
                 //if the owner has been gone at least a week, and if he has ONLY the new player claim, it will be removed
                 Calendar sevenDaysAgo = Calendar.getInstance();
-                sevenDaysAgo.add(Calendar.DATE, -GriefPrevention.instance.config_claims_unusedClaimExpirationDays);
+                sevenDaysAgo.add(Calendar.DATE, -EterniaKamui.instance.config_claims_unusedClaimExpirationDays);
                 boolean claimExpired = sevenDaysAgo.getTime().after(new Date(ownerInfo.getLastPlayed()));
                 if (claimExpired)
                 {
                     if (expireEventCanceled())
                         return;
-                    GriefPrevention.instance.dataStore.deleteClaim(claim, true, true);
-                    GriefPrevention.AddLogEntry("Removed " + claim.getOwnerName() + "'s unused claim @ " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()), CustomLogEntryTypes.AdminActivity);
+                    EterniaKamui.instance.dataStore.deleteClaim(claim, true, true);
+                    EterniaKamui.AddLogEntry("Removed " + claim.getOwnerName() + "'s unused claim @ " + EterniaKamui.getfriendlyLocationString(claim.getLesserBoundaryCorner()), CustomLogEntryTypes.AdminActivity);
 
                     //restore the claim area to natural state
-                    GriefPrevention.instance.restoreClaim(claim, 0);
+                    EterniaKamui.instance.restoreClaim(claim, 0);
                 }
             }
         }

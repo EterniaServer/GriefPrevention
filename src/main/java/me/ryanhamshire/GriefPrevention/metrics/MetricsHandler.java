@@ -1,7 +1,7 @@
 package me.ryanhamshire.GriefPrevention.metrics;
 
 import me.ryanhamshire.GriefPrevention.ClaimsMode;
-import me.ryanhamshire.GriefPrevention.GriefPrevention;
+import me.ryanhamshire.GriefPrevention.EterniaKamui;
 import org.bukkit.World;
 
 import java.util.concurrent.Callable;
@@ -15,7 +15,7 @@ public class MetricsHandler
 {
     private Metrics metrics;
 
-    public MetricsHandler(GriefPrevention plugin, String dataMode)
+    public MetricsHandler(EterniaKamui plugin, String dataMode)
     {
         metrics = new Metrics(plugin);
 

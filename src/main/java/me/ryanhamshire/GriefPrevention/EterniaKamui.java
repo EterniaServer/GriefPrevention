@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import br.com.eterniaserver.eternialib.EterniaLib;
 import me.ryanhamshire.GriefPrevention.DataStore.NoTransferException;
 import me.ryanhamshire.GriefPrevention.events.PreventBlockBreakEvent;
 import me.ryanhamshire.GriefPrevention.events.SaveTrappedPlayerEvent;
@@ -68,10 +69,12 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class GriefPrevention extends JavaPlugin
+public class EterniaKamui extends JavaPlugin
 {
     //for convenience, a reference to the instance of this plugin
-    public static GriefPrevention instance;
+    public static EterniaKamui instance;
+    public static final YamlConfiguration serverConfig = new YamlConfiguration();
+    public static final YamlConfiguration messagesConfig = new YamlConfiguration();
 
     //for logging to the console and log file
     private static Logger log;
@@ -80,7 +83,7 @@ public class GriefPrevention extends JavaPlugin
     public DataStore dataStore;
 
     //this tracks item stacks expected to drop which will need protection
-    ArrayList<PendingItemProtection> pendingItemWatchList = new ArrayList<PendingItemProtection>();
+    ArrayList<PendingItemProtection> pendingItemWatchList = new ArrayList<>();
 
     //log entry manager for GP's custom log files
     CustomLogger customLogger;
@@ -241,9 +244,9 @@ public class GriefPrevention extends JavaPlugin
     //adds a server log entry
     public static synchronized void AddLogEntry(String entry, CustomLogEntryTypes customLogType, boolean excludeFromServerLogs)
     {
-        if (customLogType != null && GriefPrevention.instance.customLogger != null)
+        if (customLogType != null && EterniaKamui.instance.customLogger != null)
         {
-            GriefPrevention.instance.customLogger.AddEntry(entry, customLogType);
+            EterniaKamui.instance.customLogger.AddEntry(entry, customLogType);
         }
         if (!excludeFromServerLogs) log.info(entry);
     }
@@ -264,6 +267,14 @@ public class GriefPrevention extends JavaPlugin
         instance = this;
         log = instance.getLogger();
 
+        PluginVars.worlds.add("world");
+        PluginVars.worlds.add("world_nether");
+        PluginVars.worlds.add("world_the_end");
+
+        EterniaLib.getManager().getCommandCompletions().registerStaticCompletion("worldenv", PluginVars.enviroments);
+        EterniaLib.getManager().getCommandCompletions().registerStaticCompletion("worldtyp", PluginVars.types);
+        EterniaLib.getManager().registerCommand(new BaseCmdMultiVerse());
+
         this.loadConfig();
 
         this.customLogger = new CustomLogger();
@@ -279,18 +290,18 @@ public class GriefPrevention extends JavaPlugin
 
                 if (FlatFileDataStore.hasData())
                 {
-                    GriefPrevention.AddLogEntry("There appears to be some data on the hard drive.  Migrating those data to the database...");
+                    EterniaKamui.AddLogEntry("There appears to be some data on the hard drive.  Migrating those data to the database...");
                     FlatFileDataStore flatFileStore = new FlatFileDataStore();
                     this.dataStore = flatFileStore;
                     flatFileStore.migrateData(databaseStore);
-                    GriefPrevention.AddLogEntry("Data migration process complete.");
+                    EterniaKamui.AddLogEntry("Data migration process complete.");
                 }
 
                 this.dataStore = databaseStore;
             }
             catch (Exception e)
             {
-                GriefPrevention.AddLogEntry("Because there was a problem with the database, GriefPrevention will not function properly.  Either update the database config settings resolve the issue, or delete those lines from your config.yml so that GriefPrevention can use the file system to store data.");
+                EterniaKamui.AddLogEntry("Because there was a problem with the database, GriefPrevention will not function properly.  Either update the database config settings resolve the issue, or delete those lines from your config.yml so that GriefPrevention can use the file system to store data.");
                 e.printStackTrace();
                 this.getServer().getPluginManager().disablePlugin(this);
                 return;
@@ -319,8 +330,8 @@ public class GriefPrevention extends JavaPlugin
             }
             catch (Exception e)
             {
-                GriefPrevention.AddLogEntry("Unable to initialize the file system data store.  Details:");
-                GriefPrevention.AddLogEntry(e.getMessage());
+                EterniaKamui.AddLogEntry("Unable to initialize the file system data store.  Details:");
+                EterniaKamui.AddLogEntry(e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -338,7 +349,7 @@ public class GriefPrevention extends JavaPlugin
 
         //start the recurring cleanup event for entities in creative worlds
         EntityCleanupTask task = new EntityCleanupTask(0);
-        this.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, task, 20L * 60 * 2);
+        this.getServer().getScheduler().scheduleSyncDelayedTask(EterniaKamui.instance, task, 20L * 60 * 2);
 
         //start recurring cleanup scan for unused claims belonging to inactive players
         FindUnusedClaimsTask task2 = new FindUnusedClaimsTask();
@@ -363,35 +374,35 @@ public class GriefPrevention extends JavaPlugin
         if (this.config_economy_claimBlocksPurchaseCost > 0 || this.config_economy_claimBlocksSellValue > 0)
         {
             //try to load Vault
-            GriefPrevention.AddLogEntry("GriefPrevention requires Vault for economy integration.");
-            GriefPrevention.AddLogEntry("Attempting to load Vault...");
+            EterniaKamui.AddLogEntry("GriefPrevention requires Vault for economy integration.");
+            EterniaKamui.AddLogEntry("Attempting to load Vault...");
             RegisteredServiceProvider<Economy> economyProvider = getServer().getServicesManager().getRegistration(net.milkbowl.vault.economy.Economy.class);
-            GriefPrevention.AddLogEntry("Vault loaded successfully!");
+            EterniaKamui.AddLogEntry("Vault loaded successfully!");
 
             //ask Vault to hook into an economy plugin
-            GriefPrevention.AddLogEntry("Looking for a Vault-compatible economy plugin...");
+            EterniaKamui.AddLogEntry("Looking for a Vault-compatible economy plugin...");
             if (economyProvider != null)
             {
-                GriefPrevention.economy = economyProvider.getProvider();
+                EterniaKamui.economy = economyProvider.getProvider();
 
                 //on success, display success message
-                if (GriefPrevention.economy != null)
+                if (EterniaKamui.economy != null)
                 {
-                    GriefPrevention.AddLogEntry("Hooked into economy: " + GriefPrevention.economy.getName() + ".");
-                    GriefPrevention.AddLogEntry("Ready to buy/sell claim blocks!");
+                    EterniaKamui.AddLogEntry("Hooked into economy: " + EterniaKamui.economy.getName() + ".");
+                    EterniaKamui.AddLogEntry("Ready to buy/sell claim blocks!");
                 }
 
                 //otherwise error message
                 else
                 {
-                    GriefPrevention.AddLogEntry("ERROR: Vault was unable to find a supported economy plugin.  Either install a Vault-compatible economy plugin, or set both of the economy config variables to zero.");
+                    EterniaKamui.AddLogEntry("ERROR: Vault was unable to find a supported economy plugin.  Either install a Vault-compatible economy plugin, or set both of the economy config variables to zero.");
                 }
             }
 
             //another error case
             else
             {
-                GriefPrevention.AddLogEntry("ERROR: Vault was unable to find a supported economy plugin.  Either install a Vault-compatible economy plugin, or set both of the economy config variables to zero.");
+                EterniaKamui.AddLogEntry("ERROR: Vault was unable to find a supported economy plugin.  Either install a Vault-compatible economy plugin, or set both of the economy config variables to zero.");
             }
         }
 
@@ -403,7 +414,7 @@ public class GriefPrevention extends JavaPlugin
 
         //load ignore lists for any already-online players
         @SuppressWarnings("unchecked")
-        Collection<Player> players = (Collection<Player>) GriefPrevention.instance.getServer().getOnlinePlayers();
+        Collection<Player> players = (Collection<Player>) EterniaKamui.instance.getServer().getOnlinePlayers();
         for (Player player : players)
         {
             new IgnoreLoaderThread(player.getUniqueId(), this.dataStore.getPlayerData(player.getUniqueId()).ignoredPlayers).start();
@@ -479,7 +490,7 @@ public class GriefPrevention extends JavaPlugin
                 }
                 else
                 {
-                    GriefPrevention.AddLogEntry("Error: Invalid claim mode \"" + configSetting + "\".  Options are Survival, Creative, and Disabled.");
+                    EterniaKamui.AddLogEntry("Error: Invalid claim mode \"" + configSetting + "\".  Options are Survival, Creative, and Disabled.");
                     this.config_claims_worldModes.put(world, ClaimsMode.Creative);
                     this.config_creativeWorldsExist = true;
                 }
@@ -662,7 +673,7 @@ public class GriefPrevention extends JavaPlugin
         this.config_claims_investigationTool = Material.getMaterial(investigationToolMaterialName);
         if (this.config_claims_investigationTool == null)
         {
-            GriefPrevention.AddLogEntry("ERROR: Material " + investigationToolMaterialName + " not found.  Defaulting to the stick.  Please update your config.yml.");
+            EterniaKamui.AddLogEntry("ERROR: Material " + investigationToolMaterialName + " not found.  Defaulting to the stick.  Please update your config.yml.");
             this.config_claims_investigationTool = Material.STICK;
         }
 
@@ -676,7 +687,7 @@ public class GriefPrevention extends JavaPlugin
         this.config_claims_modificationTool = Material.getMaterial(modificationToolMaterialName);
         if (this.config_claims_modificationTool == null)
         {
-            GriefPrevention.AddLogEntry("ERROR: Material " + modificationToolMaterialName + " not found.  Defaulting to the golden shovel.  Please update your config.yml.");
+            EterniaKamui.AddLogEntry("ERROR: Material " + modificationToolMaterialName + " not found.  Defaulting to the golden shovel.  Please update your config.yml.");
             this.config_claims_modificationTool = Material.GOLDEN_SHOVEL;
         }
 
@@ -766,7 +777,7 @@ public class GriefPrevention extends JavaPlugin
             Material material = Material.getMaterial(blockName);
             if (material == null)
             {
-                GriefPrevention.AddLogEntry("Siege Configuration: Material not found: " + blockName + ".");
+                EterniaKamui.AddLogEntry("Siege Configuration: Material not found: " + blockName + ".");
             }
             else
             {
@@ -1021,46 +1032,46 @@ public class GriefPrevention extends JavaPlugin
         //claim
         if (cmd.getName().equalsIgnoreCase("claim") && player != null)
         {
-            if (!GriefPrevention.instance.claimsEnabledForWorld(player.getWorld()))
+            if (!EterniaKamui.instance.claimsEnabledForWorld(player.getWorld()))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.ClaimsDisabledWorld);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.ClaimsDisabledWorld);
                 return true;
             }
 
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
             //if he's at the claim count per player limit already and doesn't have permission to bypass, display an error message
-            if (GriefPrevention.instance.config_claims_maxClaimsPerPlayer > 0 &&
+            if (EterniaKamui.instance.config_claims_maxClaimsPerPlayer > 0 &&
                     !player.hasPermission("griefprevention.overrideclaimcountlimit") &&
-                    playerData.getClaims().size() >= GriefPrevention.instance.config_claims_maxClaimsPerPlayer)
+                    playerData.getClaims().size() >= EterniaKamui.instance.config_claims_maxClaimsPerPlayer)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.ClaimCreationFailedOverClaimCountLimit);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.ClaimCreationFailedOverClaimCountLimit);
                 return true;
             }
 
             //default is chest claim radius, unless -1
-            int radius = GriefPrevention.instance.config_claims_automaticClaimsForNewPlayersRadius;
-            if (radius < 0) radius = (int) Math.ceil(Math.sqrt(GriefPrevention.instance.config_claims_minArea) / 2);
+            int radius = EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius;
+            if (radius < 0) radius = (int) Math.ceil(Math.sqrt(EterniaKamui.instance.config_claims_minArea) / 2);
 
             //if player has any claims, respect claim minimum size setting
             if (playerData.getClaims().size() > 0)
             {
                 //if player has exactly one land claim, this requires the claim modification tool to be in hand (or creative mode player)
-                if (playerData.getClaims().size() == 1 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != GriefPrevention.instance.config_claims_modificationTool)
+                if (playerData.getClaims().size() == 1 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
                     return true;
                 }
 
-                radius = (int) Math.ceil(Math.sqrt(GriefPrevention.instance.config_claims_minArea) / 2);
+                radius = (int) Math.ceil(Math.sqrt(EterniaKamui.instance.config_claims_minArea) / 2);
             }
 
             //allow for specifying the radius
             if (args.length > 0)
             {
-                if (playerData.getClaims().size() < 2 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != GriefPrevention.instance.config_claims_modificationTool)
+                if (playerData.getClaims().size() < 2 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.RadiusRequiresGoldenShovel);
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.RadiusRequiresGoldenShovel);
                     return true;
                 }
 
@@ -1076,7 +1087,7 @@ public class GriefPrevention extends JavaPlugin
 
                 if (specifiedRadius < radius)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.MinimumRadius, String.valueOf(radius));
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.MinimumRadius, String.valueOf(radius));
                     return true;
                 }
                 else
@@ -1095,43 +1106,43 @@ public class GriefPrevention extends JavaPlugin
             int remaining = playerData.getRemainingClaimBlocks();
             if (remaining < area)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.CreateClaimInsufficientBlocks, String.valueOf(area - remaining));
-                GriefPrevention.instance.dataStore.tryAdvertiseAdminAlternatives(player);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.CreateClaimInsufficientBlocks, String.valueOf(area - remaining));
+                EterniaKamui.instance.dataStore.tryAdvertiseAdminAlternatives(player);
                 return true;
             }
 
             CreateClaimResult result = this.dataStore.createClaim(lc.getWorld(),
                     lc.getBlockX(), gc.getBlockX(),
-                    lc.getBlockY() - GriefPrevention.instance.config_claims_claimsExtendIntoGroundDistance - 1,
-                    gc.getWorld().getHighestBlockYAt(gc) - GriefPrevention.instance.config_claims_claimsExtendIntoGroundDistance - 1,
+                    lc.getBlockY() - EterniaKamui.instance.config_claims_claimsExtendIntoGroundDistance - 1,
+                    gc.getWorld().getHighestBlockYAt(gc) - EterniaKamui.instance.config_claims_claimsExtendIntoGroundDistance - 1,
                     lc.getBlockZ(), gc.getBlockZ(),
                     player.getUniqueId(), null, null, player);
             if (!result.succeeded)
             {
                 if (result.claim != null)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapShort);
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapShort);
 
                     Visualization visualization = Visualization.FromClaim(result.claim, player.getEyeLocation().getBlockY(), VisualizationType.ErrorClaim, player.getLocation());
                     Visualization.Apply(player, visualization);
                 }
                 else
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapRegion);
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapRegion);
                 }
             }
             else
             {
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.CreateClaimSuccess);
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.CreateClaimSuccess);
 
                 //link to a video demo of land claiming, based on world type
-                if (GriefPrevention.instance.creativeRulesApply(player.getLocation()))
+                if (EterniaKamui.instance.creativeRulesApply(player.getLocation()))
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+                    EterniaKamui.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
                 }
-                else if (GriefPrevention.instance.claimsEnabledForWorld(player.getLocation().getWorld()))
+                else if (EterniaKamui.instance.claimsEnabledForWorld(player.getLocation().getWorld()))
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+                    EterniaKamui.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
                 }
                 Visualization visualization = Visualization.FromClaim(result.claim, player.getEyeLocation().getBlockY(), VisualizationType.Claim, player.getLocation());
                 Visualization.Apply(player, visualization);
@@ -1150,13 +1161,13 @@ public class GriefPrevention extends JavaPlugin
             if (args.length < 1)
             {
                 //link to a video demo of land claiming, based on world type
-                if (GriefPrevention.instance.creativeRulesApply(player.getLocation()))
+                if (EterniaKamui.instance.creativeRulesApply(player.getLocation()))
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+                    EterniaKamui.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
                 }
-                else if (GriefPrevention.instance.claimsEnabledForWorld(player.getLocation().getWorld()))
+                else if (EterniaKamui.instance.claimsEnabledForWorld(player.getLocation().getWorld()))
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+                    EterniaKamui.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
                 }
                 return false;
             }
@@ -1169,21 +1180,21 @@ public class GriefPrevention extends JavaPlugin
             catch (NumberFormatException e)
             {
                 //link to a video demo of land claiming, based on world type
-                if (GriefPrevention.instance.creativeRulesApply(player.getLocation()))
+                if (EterniaKamui.instance.creativeRulesApply(player.getLocation()))
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
+                    EterniaKamui.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
                 }
-                else if (GriefPrevention.instance.claimsEnabledForWorld(player.getLocation().getWorld()))
+                else if (EterniaKamui.instance.claimsEnabledForWorld(player.getLocation().getWorld()))
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+                    EterniaKamui.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
                 }
                 return false;
             }
 
             //requires claim modification tool in hand
-            if (player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != GriefPrevention.instance.config_claims_modificationTool)
+            if (player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
                 return true;
             }
 
@@ -1192,7 +1203,7 @@ public class GriefPrevention extends JavaPlugin
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, playerData.lastClaim);
             if (claim == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.StandInClaimToResize);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.StandInClaimToResize);
                 return true;
             }
 
@@ -1200,7 +1211,7 @@ public class GriefPrevention extends JavaPlugin
             String errorMessage = claim.allowEdit(player);
             if (errorMessage != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NotYourClaim);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotYourClaim);
                 return true;
             }
 
@@ -1208,13 +1219,13 @@ public class GriefPrevention extends JavaPlugin
             org.bukkit.util.Vector direction = player.getLocation().getDirection();
             if (direction.getY() > .75)
             {
-                GriefPrevention.sendMessage(player, TextMode.Info, Messages.ClaimsExtendToSky);
+                EterniaKamui.sendMessage(player, TextMode.Info, Messages.ClaimsExtendToSky);
                 return true;
             }
 
             if (direction.getY() < -.75)
             {
-                GriefPrevention.sendMessage(player, TextMode.Info, Messages.ClaimsAutoExtendDownward);
+                EterniaKamui.sendMessage(player, TextMode.Info, Messages.ClaimsAutoExtendDownward);
                 return true;
             }
 
@@ -1305,11 +1316,11 @@ public class GriefPrevention extends JavaPlugin
             //toggle ignore claims mode on or off
             if (!playerData.ignoreClaims)
             {
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.RespectingClaims);
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.RespectingClaims);
             }
             else
             {
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.IgnoringClaims);
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.IgnoringClaims);
             }
 
             return true;
@@ -1322,7 +1333,7 @@ public class GriefPrevention extends JavaPlugin
 
             if (!"confirm".equalsIgnoreCase(args[0]))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.ConfirmAbandonAllClaims);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.ConfirmAbandonAllClaims);
                 return true;
             }
 
@@ -1333,7 +1344,7 @@ public class GriefPrevention extends JavaPlugin
             //check count
             if (originalClaimCount == 0)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.YouHaveNoClaims);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.YouHaveNoClaims);
                 return true;
             }
 
@@ -1352,7 +1363,7 @@ public class GriefPrevention extends JavaPlugin
 
             //inform the player
             int remainingBlocks = playerData.getRemainingClaimBlocks();
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.SuccessfulAbandon, String.valueOf(remainingBlocks));
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.SuccessfulAbandon, String.valueOf(remainingBlocks));
 
             //revert any current visualization
             Visualization.Revert(player);
@@ -1366,7 +1377,7 @@ public class GriefPrevention extends JavaPlugin
             //change shovel mode
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.RestoreNature;
-            GriefPrevention.sendMessage(player, TextMode.Instr, Messages.RestoreNatureActivate);
+            EterniaKamui.sendMessage(player, TextMode.Instr, Messages.RestoreNatureActivate);
             return true;
         }
 
@@ -1376,7 +1387,7 @@ public class GriefPrevention extends JavaPlugin
             //change shovel mode
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.RestoreNatureAggressive;
-            GriefPrevention.sendMessage(player, TextMode.Warn, Messages.RestoreNatureAggressiveActivate);
+            EterniaKamui.sendMessage(player, TextMode.Warn, Messages.RestoreNatureAggressiveActivate);
             return true;
         }
 
@@ -1400,7 +1411,7 @@ public class GriefPrevention extends JavaPlugin
 
             if (playerData.fillRadius < 0) playerData.fillRadius = 2;
 
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.FillModeActive, String.valueOf(playerData.fillRadius));
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.FillModeActive, String.valueOf(playerData.fillRadius));
             return true;
         }
 
@@ -1423,14 +1434,14 @@ public class GriefPrevention extends JavaPlugin
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, null);
             if (claim == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Instr, Messages.TransferClaimMissing);
+                EterniaKamui.sendMessage(player, TextMode.Instr, Messages.TransferClaimMissing);
                 return true;
             }
 
             //check additional permission for admin claims
             if (claim.isAdminClaim() && !player.hasPermission("griefprevention.adminclaims"))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.TransferClaimPermission);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.TransferClaimPermission);
                 return true;
             }
 
@@ -1442,7 +1453,7 @@ public class GriefPrevention extends JavaPlugin
                 OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
                 if (targetPlayer == null)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                     return true;
                 }
                 newOwnerID = targetPlayer.getUniqueId();
@@ -1456,13 +1467,13 @@ public class GriefPrevention extends JavaPlugin
             }
             catch (NoTransferException e)
             {
-                GriefPrevention.sendMessage(player, TextMode.Instr, Messages.TransferTopLevel);
+                EterniaKamui.sendMessage(player, TextMode.Instr, Messages.TransferTopLevel);
                 return true;
             }
 
             //confirm
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.TransferSuccess);
-            GriefPrevention.AddLogEntry(player.getName() + " transferred a claim at " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()) + " to " + ownerName + ".", CustomLogEntryTypes.AdminActivity);
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.TransferSuccess);
+            EterniaKamui.AddLogEntry(player.getName() + " transferred a claim at " + EterniaKamui.getfriendlyLocationString(claim.getLesserBoundaryCorner()) + " to " + ownerName + ".", CustomLogEntryTypes.AdminActivity);
 
             return true;
         }
@@ -1475,7 +1486,7 @@ public class GriefPrevention extends JavaPlugin
             //if no claim here, error message
             if (claim == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.TrustListNoClaim);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.TrustListNoClaim);
                 return true;
             }
 
@@ -1483,7 +1494,7 @@ public class GriefPrevention extends JavaPlugin
             String errorMessage = claim.allowGrantPermission(player);
             if (errorMessage != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, errorMessage);
+                EterniaKamui.sendMessage(player, TextMode.Err, errorMessage);
                 return true;
             }
 
@@ -1495,7 +1506,7 @@ public class GriefPrevention extends JavaPlugin
             ArrayList<String> managers = new ArrayList<String>();
             claim.getPermissions(builders, containers, accessors, managers);
 
-            GriefPrevention.sendMessage(player, TextMode.Info, Messages.TrustListHeader);
+            EterniaKamui.sendMessage(player, TextMode.Info, Messages.TrustListHeader);
 
             StringBuilder permissions = new StringBuilder();
             permissions.append(ChatColor.GOLD + ">");
@@ -1546,7 +1557,7 @@ public class GriefPrevention extends JavaPlugin
 
             if (claim.getSubclaimRestrictions())
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.HasSubclaimRestriction);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.HasSubclaimRestriction);
             }
 
             return true;
@@ -1578,7 +1589,7 @@ public class GriefPrevention extends JavaPlugin
                 }
                 else
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.ClearPermsOwnerOnly);
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.ClearPermsOwnerOnly);
                     return true;
                 }
             }
@@ -1590,7 +1601,7 @@ public class GriefPrevention extends JavaPlugin
                     otherPlayer = this.resolvePlayerByName(args[0]);
                     if (!clearPermissions && otherPlayer == null && !args[0].equals("public"))
                     {
-                        GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                        EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                         return true;
                     }
 
@@ -1651,18 +1662,18 @@ public class GriefPrevention extends JavaPlugin
                 //confirmation message
                 if (!clearPermissions)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Success, Messages.UntrustIndividualAllClaims, args[0]);
+                    EterniaKamui.sendMessage(player, TextMode.Success, Messages.UntrustIndividualAllClaims, args[0]);
                 }
                 else
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Success, Messages.UntrustEveryoneAllClaims);
+                    EterniaKamui.sendMessage(player, TextMode.Success, Messages.UntrustEveryoneAllClaims);
                 }
             }
 
             //otherwise, apply changes to only this claim
             else if (claim.allowGrantPermission(player) != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NoPermissionTrust, claim.getOwnerName());
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoPermissionTrust, claim.getOwnerName());
                 return true;
             }
             else
@@ -1673,7 +1684,7 @@ public class GriefPrevention extends JavaPlugin
                     //requires owner
                     if (claim.allowEdit(player) != null)
                     {
-                        GriefPrevention.sendMessage(player, TextMode.Err, Messages.UntrustAllOwnerOnly);
+                        EterniaKamui.sendMessage(player, TextMode.Err, Messages.UntrustAllOwnerOnly);
                         return true;
                     }
 
@@ -1687,7 +1698,7 @@ public class GriefPrevention extends JavaPlugin
                     }
 
                     claim.clearPermissions();
-                    GriefPrevention.sendMessage(player, TextMode.Success, Messages.ClearPermissionsOneClaim);
+                    EterniaKamui.sendMessage(player, TextMode.Success, Messages.ClearPermissionsOneClaim);
                 }
 
                 //otherwise individual permission drop
@@ -1701,7 +1712,7 @@ public class GriefPrevention extends JavaPlugin
                     boolean targetIsManager = claim.managers.contains(idToDrop);
                     if (targetIsManager && claim.allowEdit(player) != null)  //only claim owners can untrust managers
                     {
-                        GriefPrevention.sendMessage(player, TextMode.Err, Messages.ManagersDontUntrustManagers, claim.getOwnerName());
+                        EterniaKamui.sendMessage(player, TextMode.Err, Messages.ManagersDontUntrustManagers, claim.getOwnerName());
                         return true;
                     }
                     else
@@ -1724,7 +1735,7 @@ public class GriefPrevention extends JavaPlugin
                             args[0] = "the public";
                         }
 
-                        GriefPrevention.sendMessage(player, TextMode.Success, Messages.UntrustIndividualSingleClaim, args[0]);
+                        EterniaKamui.sendMessage(player, TextMode.Success, Messages.UntrustIndividualSingleClaim, args[0]);
                     }
                 }
 
@@ -1775,7 +1786,7 @@ public class GriefPrevention extends JavaPlugin
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, playerData.lastClaim);
             if (claim == null || claim.parent == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.StandInSubclaim);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.StandInSubclaim);
                 return true;
             }
 
@@ -1784,19 +1795,19 @@ public class GriefPrevention extends JavaPlugin
             // If not an admin claim, fail if this user is not the owner
             if (!playerData.ignoreClaims && (claim.isAdminClaim() ? !player.hasPermission("griefprevention.adminclaims") : !player.getUniqueId().equals(claim.parent.ownerID)))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.OnlyOwnersModifyClaims, claim.getOwnerName());
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.OnlyOwnersModifyClaims, claim.getOwnerName());
                 return true;
             }
 
             if (claim.getSubclaimRestrictions())
             {
                 claim.setSubclaimRestrictions(false);
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.SubclaimUnrestricted);
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.SubclaimUnrestricted);
             }
             else
             {
                 claim.setSubclaimRestrictions(true);
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.SubclaimRestricted);
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.SubclaimRestricted);
             }
             this.dataStore.saveClaim(claim);
             return true;
@@ -1806,29 +1817,29 @@ public class GriefPrevention extends JavaPlugin
         else if (cmd.getName().equalsIgnoreCase("buyclaimblocks") && player != null)
         {
             //if economy is disabled, don't do anything
-            if (GriefPrevention.economy == null)
+            if (EterniaKamui.economy == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.BuySellNotConfigured);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.BuySellNotConfigured);
                 return true;
             }
 
             if (!player.hasPermission("griefprevention.buysellclaimblocks"))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NoPermissionForCommand);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoPermissionForCommand);
                 return true;
             }
 
             //if purchase disabled, send error message
-            if (GriefPrevention.instance.config_economy_claimBlocksPurchaseCost == 0)
+            if (EterniaKamui.instance.config_economy_claimBlocksPurchaseCost == 0)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.OnlySellBlocks);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.OnlySellBlocks);
                 return true;
             }
 
             //if no parameter, just tell player cost per block and balance
             if (args.length != 1)
             {
-                GriefPrevention.sendMessage(player, TextMode.Info, Messages.BlockPurchaseCost, String.valueOf(GriefPrevention.instance.config_economy_claimBlocksPurchaseCost), String.valueOf(GriefPrevention.economy.getBalance(player.getName())));
+                EterniaKamui.sendMessage(player, TextMode.Info, Messages.BlockPurchaseCost, String.valueOf(EterniaKamui.instance.config_economy_claimBlocksPurchaseCost), String.valueOf(EterniaKamui.economy.getBalance(player.getName())));
                 return false;
             }
             else
@@ -1853,10 +1864,10 @@ public class GriefPrevention extends JavaPlugin
 
                 //if the player can't afford his purchase, send error message
                 double balance = economy.getBalance(player.getName());
-                double totalCost = blockCount * GriefPrevention.instance.config_economy_claimBlocksPurchaseCost;
+                double totalCost = blockCount * EterniaKamui.instance.config_economy_claimBlocksPurchaseCost;
                 if (totalCost > balance)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.InsufficientFunds, String.valueOf(totalCost), String.valueOf(balance));
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.InsufficientFunds, String.valueOf(totalCost), String.valueOf(balance));
                 }
 
                 //otherwise carry out transaction
@@ -1865,10 +1876,10 @@ public class GriefPrevention extends JavaPlugin
                     int newBonusClaimBlocks = playerData.getBonusClaimBlocks() + blockCount;
 
                     //if the player is going to reach max bonus limit, send error message
-                    int bonusBlocksLimit = GriefPrevention.instance.config_economy_claimBlocksMaxBonus;
+                    int bonusBlocksLimit = EterniaKamui.instance.config_economy_claimBlocksMaxBonus;
                     if (bonusBlocksLimit != 0 && newBonusClaimBlocks > bonusBlocksLimit)
                     {
-                        GriefPrevention.sendMessage(player, TextMode.Err, Messages.MaxBonusReached, String.valueOf(blockCount), String.valueOf(bonusBlocksLimit));
+                        EterniaKamui.sendMessage(player, TextMode.Err, Messages.MaxBonusReached, String.valueOf(blockCount), String.valueOf(bonusBlocksLimit));
                         return true;
                     }
 
@@ -1880,7 +1891,7 @@ public class GriefPrevention extends JavaPlugin
                     this.dataStore.savePlayerData(player.getUniqueId(), playerData);
 
                     //inform player
-                    GriefPrevention.sendMessage(player, TextMode.Success, Messages.PurchaseConfirmation, String.valueOf(totalCost), String.valueOf(playerData.getRemainingClaimBlocks()));
+                    EterniaKamui.sendMessage(player, TextMode.Success, Messages.PurchaseConfirmation, String.valueOf(totalCost), String.valueOf(playerData.getRemainingClaimBlocks()));
                 }
 
                 return true;
@@ -1891,22 +1902,22 @@ public class GriefPrevention extends JavaPlugin
         else if (cmd.getName().equalsIgnoreCase("sellclaimblocks") && player != null)
         {
             //if economy is disabled, don't do anything
-            if (GriefPrevention.economy == null)
+            if (EterniaKamui.economy == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.BuySellNotConfigured);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.BuySellNotConfigured);
                 return true;
             }
 
             if (!player.hasPermission("griefprevention.buysellclaimblocks"))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NoPermissionForCommand);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoPermissionForCommand);
                 return true;
             }
 
             //if disabled, error message
-            if (GriefPrevention.instance.config_economy_claimBlocksSellValue == 0)
+            if (EterniaKamui.instance.config_economy_claimBlocksSellValue == 0)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.OnlyPurchaseBlocks);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.OnlyPurchaseBlocks);
                 return true;
             }
 
@@ -1917,7 +1928,7 @@ public class GriefPrevention extends JavaPlugin
             //if no amount provided, just tell player value per block sold, and how many he can sell
             if (args.length != 1)
             {
-                GriefPrevention.sendMessage(player, TextMode.Info, Messages.BlockSaleValue, String.valueOf(GriefPrevention.instance.config_economy_claimBlocksSellValue), String.valueOf(availableBlocks));
+                EterniaKamui.sendMessage(player, TextMode.Info, Messages.BlockSaleValue, String.valueOf(EterniaKamui.instance.config_economy_claimBlocksSellValue), String.valueOf(availableBlocks));
                 return false;
             }
 
@@ -1940,14 +1951,14 @@ public class GriefPrevention extends JavaPlugin
             //if he doesn't have enough blocks, tell him so
             if (blockCount > availableBlocks)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NotEnoughBlocksForSale);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotEnoughBlocksForSale);
             }
 
             //otherwise carry out the transaction
             else
             {
                 //compute value and deposit it
-                double totalValue = blockCount * GriefPrevention.instance.config_economy_claimBlocksSellValue;
+                double totalValue = blockCount * EterniaKamui.instance.config_economy_claimBlocksSellValue;
                 economy.depositPlayer(player.getName(), totalValue);
 
                 //subtract blocks
@@ -1955,7 +1966,7 @@ public class GriefPrevention extends JavaPlugin
                 this.dataStore.savePlayerData(player.getUniqueId(), playerData);
 
                 //inform player
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.BlockSaleConfirmation, String.valueOf(totalValue), String.valueOf(playerData.getRemainingClaimBlocks()));
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.BlockSaleConfirmation, String.valueOf(totalValue), String.valueOf(playerData.getRemainingClaimBlocks()));
             }
 
             return true;
@@ -1966,7 +1977,7 @@ public class GriefPrevention extends JavaPlugin
         {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.Admin;
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.AdminClaimsMode);
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.AdminClaimsMode);
 
             return true;
         }
@@ -1977,7 +1988,7 @@ public class GriefPrevention extends JavaPlugin
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.Basic;
             playerData.claimSubdividing = null;
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.BasicClaimsMode);
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.BasicClaimsMode);
 
             return true;
         }
@@ -1988,8 +1999,8 @@ public class GriefPrevention extends JavaPlugin
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.Subdivide;
             playerData.claimSubdividing = null;
-            GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SubdivisionMode);
-            GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, DataStore.SUBDIVISION_VIDEO_URL);
+            EterniaKamui.sendMessage(player, TextMode.Instr, Messages.SubdivisionMode);
+            EterniaKamui.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, DataStore.SUBDIVISION_VIDEO_URL);
 
             return true;
         }
@@ -2002,7 +2013,7 @@ public class GriefPrevention extends JavaPlugin
 
             if (claim == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.DeleteClaimMissing);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.DeleteClaimMissing);
             }
             else
             {
@@ -2012,7 +2023,7 @@ public class GriefPrevention extends JavaPlugin
                     PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
                     if (claim.children.size() > 0 && !playerData.warnedAboutMajorDeletion)
                     {
-                        GriefPrevention.sendMessage(player, TextMode.Warn, Messages.DeletionSubdivisionWarning);
+                        EterniaKamui.sendMessage(player, TextMode.Warn, Messages.DeletionSubdivisionWarning);
                         playerData.warnedAboutMajorDeletion = true;
                     }
                     else
@@ -2021,13 +2032,13 @@ public class GriefPrevention extends JavaPlugin
                         this.dataStore.deleteClaim(claim, true, true);
 
                         //if in a creative mode world, /restorenature the claim
-                        if (GriefPrevention.instance.creativeRulesApply(claim.getLesserBoundaryCorner()) || GriefPrevention.instance.config_claims_survivalAutoNatureRestoration)
+                        if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()) || EterniaKamui.instance.config_claims_survivalAutoNatureRestoration)
                         {
-                            GriefPrevention.instance.restoreClaim(claim, 0);
+                            EterniaKamui.instance.restoreClaim(claim, 0);
                         }
 
-                        GriefPrevention.sendMessage(player, TextMode.Success, Messages.DeleteSuccess);
-                        GriefPrevention.AddLogEntry(player.getName() + " deleted " + claim.getOwnerName() + "'s claim at " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()), CustomLogEntryTypes.AdminActivity);
+                        EterniaKamui.sendMessage(player, TextMode.Success, Messages.DeleteSuccess);
+                        EterniaKamui.AddLogEntry(player.getName() + " deleted " + claim.getOwnerName() + "'s claim at " + EterniaKamui.getfriendlyLocationString(claim.getLesserBoundaryCorner()), CustomLogEntryTypes.AdminActivity);
 
                         //revert any current visualization
                         Visualization.Revert(player);
@@ -2037,7 +2048,7 @@ public class GriefPrevention extends JavaPlugin
                 }
                 else
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.CantDeleteAdminClaim);
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.CantDeleteAdminClaim);
                 }
             }
 
@@ -2050,26 +2061,26 @@ public class GriefPrevention extends JavaPlugin
 
             if (claim == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.DeleteClaimMissing);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.DeleteClaimMissing);
             }
             else
             {
                 String noBuildReason = claim.allowBuild(player, Material.STONE);
                 if (noBuildReason != null)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, noBuildReason);
+                    EterniaKamui.sendMessage(player, TextMode.Err, noBuildReason);
                     return true;
                 }
 
                 if (claim.areExplosivesAllowed)
                 {
                     claim.areExplosivesAllowed = false;
-                    GriefPrevention.sendMessage(player, TextMode.Success, Messages.ExplosivesDisabled);
+                    EterniaKamui.sendMessage(player, TextMode.Success, Messages.ExplosivesDisabled);
                 }
                 else
                 {
                     claim.areExplosivesAllowed = true;
-                    GriefPrevention.sendMessage(player, TextMode.Success, Messages.ExplosivesEnabled);
+                    EterniaKamui.sendMessage(player, TextMode.Success, Messages.ExplosivesEnabled);
                 }
             }
 
@@ -2086,17 +2097,17 @@ public class GriefPrevention extends JavaPlugin
             OfflinePlayer otherPlayer = this.resolvePlayerByName(args[0]);
             if (otherPlayer == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
             //delete all that player's claims
             this.dataStore.deleteClaimsForPlayer(otherPlayer.getUniqueId(), true);
 
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.DeleteAllSuccess, otherPlayer.getName());
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.DeleteAllSuccess, otherPlayer.getName());
             if (player != null)
             {
-                GriefPrevention.AddLogEntry(player.getName() + " deleted all claims belonging to " + otherPlayer.getName() + ".", CustomLogEntryTypes.AdminActivity);
+                EterniaKamui.AddLogEntry(player.getName() + " deleted all claims belonging to " + otherPlayer.getName() + ".", CustomLogEntryTypes.AdminActivity);
 
                 //revert any current visualization
                 Visualization.Revert(player);
@@ -2109,7 +2120,7 @@ public class GriefPrevention extends JavaPlugin
             //must be executed at the console
             if (player != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.ConsoleOnlyCommand);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.ConsoleOnlyCommand);
                 return true;
             }
 
@@ -2120,13 +2131,13 @@ public class GriefPrevention extends JavaPlugin
             World world = Bukkit.getServer().getWorld(args[0]);
             if (world == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.WorldNotFound);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.WorldNotFound);
                 return true;
             }
 
             //delete all claims in that world
             this.dataStore.deleteClaimsInWorld(world, true);
-            GriefPrevention.AddLogEntry("Deleted all claims in world: " + world.getName() + ".", CustomLogEntryTypes.AdminActivity);
+            EterniaKamui.AddLogEntry("Deleted all claims in world: " + world.getName() + ".", CustomLogEntryTypes.AdminActivity);
             return true;
         }
         else if (cmd.getName().equalsIgnoreCase("deleteuserclaimsinworld"))
@@ -2134,7 +2145,7 @@ public class GriefPrevention extends JavaPlugin
             //must be executed at the console
             if (player != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.ConsoleOnlyCommand);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.ConsoleOnlyCommand);
                 return true;
             }
 
@@ -2145,13 +2156,13 @@ public class GriefPrevention extends JavaPlugin
             World world = Bukkit.getServer().getWorld(args[0]);
             if (world == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.WorldNotFound);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.WorldNotFound);
                 return true;
             }
 
             //delete all USER claims in that world
             this.dataStore.deleteClaimsInWorld(world, false);
-            GriefPrevention.AddLogEntry("Deleted all user claims in world: " + world.getName() + ".", CustomLogEntryTypes.AdminActivity);
+            EterniaKamui.AddLogEntry("Deleted all user claims in world: " + world.getName() + ".", CustomLogEntryTypes.AdminActivity);
             return true;
         }
 
@@ -2165,7 +2176,7 @@ public class GriefPrevention extends JavaPlugin
             Player otherPlayer = this.getServer().getPlayer(args[0]);
             if (otherPlayer == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
             else
@@ -2197,7 +2208,7 @@ public class GriefPrevention extends JavaPlugin
             //otherwise if no permission to delve into another player's claims data
             else if (player != null && !player.hasPermission("griefprevention.claimslistother"))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.ClaimsListNoPermission);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.ClaimsListNoPermission);
                 return true;
             }
 
@@ -2207,7 +2218,7 @@ public class GriefPrevention extends JavaPlugin
                 otherPlayer = this.resolvePlayerByName(args[0]);
                 if (otherPlayer == null)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                     return true;
                 }
             }
@@ -2215,20 +2226,20 @@ public class GriefPrevention extends JavaPlugin
             //load the target player's data
             PlayerData playerData = this.dataStore.getPlayerData(otherPlayer.getUniqueId());
             Vector<Claim> claims = playerData.getClaims();
-            GriefPrevention.sendMessage(player, TextMode.Instr, Messages.StartBlockMath,
+            EterniaKamui.sendMessage(player, TextMode.Instr, Messages.StartBlockMath,
                     String.valueOf(playerData.getAccruedClaimBlocks()),
                     String.valueOf((playerData.getBonusClaimBlocks() + this.dataStore.getGroupBonusBlocks(otherPlayer.getUniqueId()))),
                     String.valueOf((playerData.getAccruedClaimBlocks() + playerData.getBonusClaimBlocks() + this.dataStore.getGroupBonusBlocks(otherPlayer.getUniqueId()))));
             if (claims.size() > 0)
             {
-                GriefPrevention.sendMessage(player, TextMode.Instr, Messages.ClaimsListHeader);
+                EterniaKamui.sendMessage(player, TextMode.Instr, Messages.ClaimsListHeader);
                 for (int i = 0; i < playerData.getClaims().size(); i++)
                 {
                     Claim claim = playerData.getClaims().get(i);
-                    GriefPrevention.sendMessage(player, TextMode.Instr, getfriendlyLocationString(claim.getLesserBoundaryCorner()) + this.dataStore.getMessage(Messages.ContinueBlockMath, String.valueOf(claim.getArea())));
+                    EterniaKamui.sendMessage(player, TextMode.Instr, getfriendlyLocationString(claim.getLesserBoundaryCorner()) + this.dataStore.getMessage(Messages.ContinueBlockMath, String.valueOf(claim.getArea())));
                 }
 
-                GriefPrevention.sendMessage(player, TextMode.Instr, Messages.EndBlockMath, String.valueOf(playerData.getRemainingClaimBlocks()));
+                EterniaKamui.sendMessage(player, TextMode.Instr, Messages.EndBlockMath, String.valueOf(playerData.getRemainingClaimBlocks()));
             }
 
             //drop the data we just loaded, if the player isn't online
@@ -2252,11 +2263,11 @@ public class GriefPrevention extends JavaPlugin
             }
             if (claims.size() > 0)
             {
-                GriefPrevention.sendMessage(player, TextMode.Instr, Messages.ClaimsListHeader);
+                EterniaKamui.sendMessage(player, TextMode.Instr, Messages.ClaimsListHeader);
                 for (int i = 0; i < claims.size(); i++)
                 {
                     Claim claim = claims.get(i);
-                    GriefPrevention.sendMessage(player, TextMode.Instr, getfriendlyLocationString(claim.getLesserBoundaryCorner()));
+                    EterniaKamui.sendMessage(player, TextMode.Instr, getfriendlyLocationString(claim.getLesserBoundaryCorner()));
                 }
             }
 
@@ -2273,17 +2284,17 @@ public class GriefPrevention extends JavaPlugin
                 Player otherPlayer = Bukkit.getPlayer(args[0]);
                 if (otherPlayer == null)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                     return true;
                 }
 
                 playerData = this.dataStore.getPlayerData(otherPlayer.getUniqueId());
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.DropUnlockOthersConfirmation, otherPlayer.getName());
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.DropUnlockOthersConfirmation, otherPlayer.getName());
             }
             else
             {
                 playerData = this.dataStore.getPlayerData(player.getUniqueId());
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.DropUnlockConfirmation);
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.DropUnlockConfirmation);
             }
 
             playerData.dropsAreUnlocked = true;
@@ -2296,17 +2307,17 @@ public class GriefPrevention extends JavaPlugin
         {
             if (!player.hasPermission("griefprevention.deleteclaims"))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NoDeletePermission);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoDeletePermission);
                 return true;
             }
 
             //delete all admin claims
             this.dataStore.deleteClaimsForPlayer(null, true);  //null for owner id indicates an administrative claim
 
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.AllAdminDeleted);
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.AllAdminDeleted);
             if (player != null)
             {
-                GriefPrevention.AddLogEntry(player.getName() + " deleted all administrative claims.", CustomLogEntryTypes.AdminActivity);
+                EterniaKamui.AddLogEntry(player.getName() + " deleted all administrative claims.", CustomLogEntryTypes.AdminActivity);
 
                 //revert any current visualization
                 Visualization.Revert(player);
@@ -2338,9 +2349,9 @@ public class GriefPrevention extends JavaPlugin
                 String permissionIdentifier = args[0].substring(1, args[0].length() - 1);
                 int newTotal = this.dataStore.adjustGroupBonusBlocks(permissionIdentifier, adjustment);
 
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.AdjustGroupBlocksSuccess, permissionIdentifier, String.valueOf(adjustment), String.valueOf(newTotal));
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.AdjustGroupBlocksSuccess, permissionIdentifier, String.valueOf(adjustment), String.valueOf(newTotal));
                 if (player != null)
-                    GriefPrevention.AddLogEntry(player.getName() + " adjusted " + permissionIdentifier + "'s bonus claim blocks by " + adjustment + ".");
+                    EterniaKamui.AddLogEntry(player.getName() + " adjusted " + permissionIdentifier + "'s bonus claim blocks by " + adjustment + ".");
 
                 return true;
             }
@@ -2360,7 +2371,7 @@ public class GriefPrevention extends JavaPlugin
 
             if (targetPlayer == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
@@ -2369,9 +2380,9 @@ public class GriefPrevention extends JavaPlugin
             playerData.setBonusClaimBlocks(playerData.getBonusClaimBlocks() + adjustment);
             this.dataStore.savePlayerData(targetPlayer.getUniqueId(), playerData);
 
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.AdjustBlocksSuccess, targetPlayer.getName(), String.valueOf(adjustment), String.valueOf(playerData.getBonusClaimBlocks()));
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.AdjustBlocksSuccess, targetPlayer.getName(), String.valueOf(adjustment), String.valueOf(playerData.getBonusClaimBlocks()));
             if (player != null)
-                GriefPrevention.AddLogEntry(player.getName() + " adjusted " + targetPlayer.getName() + "'s bonus claim blocks by " + adjustment + ".", CustomLogEntryTypes.AdminActivity);
+                EterniaKamui.AddLogEntry(player.getName() + " adjusted " + targetPlayer.getName() + "'s bonus claim blocks by " + adjustment + ".", CustomLogEntryTypes.AdminActivity);
 
             return true;
         }
@@ -2406,8 +2417,8 @@ public class GriefPrevention extends JavaPlugin
                 builder.append(onlinePlayer.getName() + " ");
             }
 
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.AdjustBlocksAllSuccess, String.valueOf(adjustment));
-            GriefPrevention.AddLogEntry("Adjusted all " + players.size() + "players' bonus claim blocks by " + adjustment + ".  " + builder.toString(), CustomLogEntryTypes.AdminActivity);
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.AdjustBlocksAllSuccess, String.valueOf(adjustment));
+            EterniaKamui.AddLogEntry("Adjusted all " + players.size() + "players' bonus claim blocks by " + adjustment + ".  " + builder.toString(), CustomLogEntryTypes.AdminActivity);
 
             return true;
         }
@@ -2433,7 +2444,7 @@ public class GriefPrevention extends JavaPlugin
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
             if (targetPlayer == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
@@ -2442,9 +2453,9 @@ public class GriefPrevention extends JavaPlugin
             playerData.setAccruedClaimBlocks(newAmount);
             this.dataStore.savePlayerData(targetPlayer.getUniqueId(), playerData);
 
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.SetClaimBlocksSuccess);
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.SetClaimBlocksSuccess);
             if (player != null)
-                GriefPrevention.AddLogEntry(player.getName() + " set " + targetPlayer.getName() + "'s accrued claim blocks to " + newAmount + ".", CustomLogEntryTypes.AdminActivity);
+                EterniaKamui.AddLogEntry(player.getName() + " set " + targetPlayer.getName() + "'s accrued claim blocks to " + newAmount + ".", CustomLogEntryTypes.AdminActivity);
 
             return true;
         }
@@ -2466,7 +2477,7 @@ public class GriefPrevention extends JavaPlugin
             //if the player isn't in a claim or has permission to build, tell him to man up
             if (claim == null || claim.allowBuild(player, Material.AIR) == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NotTrappedHere);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotTrappedHere);
                 return true;
             }
 
@@ -2477,18 +2488,18 @@ public class GriefPrevention extends JavaPlugin
             //if the player is in the nether or end, he's screwed (there's no way to programmatically find a safe place for him)
             if (player.getWorld().getEnvironment() != Environment.NORMAL && event.getDestination() == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
                 return true;
             }
 
             //if the player is in an administrative claim and AllowTrappedInAdminClaims is false, he should contact an admin
-            if (!GriefPrevention.instance.config_claims_allowTrappedInAdminClaims && claim.isAdminClaim() && event.getDestination() == null)
+            if (!EterniaKamui.instance.config_claims_allowTrappedInAdminClaims && claim.isAdminClaim() && event.getDestination() == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
                 return true;
             }
             //send instructions
-            GriefPrevention.sendMessage(player, TextMode.Instr, Messages.RescuePending);
+            EterniaKamui.sendMessage(player, TextMode.Instr, Messages.RescuePending);
 
             //create a task to rescue this player in a little while
             PlayerRescueTask task = new PlayerRescueTask(player, player.getLocation(), event.getDestination());
@@ -2503,7 +2514,7 @@ public class GriefPrevention extends JavaPlugin
             //error message for when siege mode is disabled
             if (!this.siegeEnabledForWorld(player.getWorld()))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NonSiegeWorld);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NonSiegeWorld);
                 return true;
             }
 
@@ -2518,14 +2529,14 @@ public class GriefPrevention extends JavaPlugin
             PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
             if (attackerData.siegeData != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.AlreadySieging);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.AlreadySieging);
                 return true;
             }
 
             //can't start a siege when you're protected from pvp combat
             if (attackerData.pvpImmune)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.CantFightWhileImmune);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.CantFightWhileImmune);
                 return true;
             }
 
@@ -2536,7 +2547,7 @@ public class GriefPrevention extends JavaPlugin
                 defender = this.getServer().getPlayer(args[0]);
                 if (defender == null)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                     return true;
                 }
             }
@@ -2559,14 +2570,14 @@ public class GriefPrevention extends JavaPlugin
             // silly:
             if (attacker.getName().equals(defender.getName()))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NoSiegeYourself);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoSiegeYourself);
                 return true;
             }
 
             //victim must not have the permission which makes him immune to siege
             if (defender.hasPermission("griefprevention.siegeimmune"))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.SiegeImmune);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.SiegeImmune);
                 return true;
             }
 
@@ -2574,14 +2585,14 @@ public class GriefPrevention extends JavaPlugin
             PlayerData defenderData = this.dataStore.getPlayerData(defender.getUniqueId());
             if (defenderData.siegeData != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.AlreadyUnderSiegePlayer);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.AlreadyUnderSiegePlayer);
                 return true;
             }
 
             //victim must not be pvp immune
             if (defenderData.pvpImmune)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NoSiegeDefenseless);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoSiegeDefenseless);
                 return true;
             }
 
@@ -2590,35 +2601,35 @@ public class GriefPrevention extends JavaPlugin
             //defender must have some level of permission there to be protected
             if (defenderClaim == null || defenderClaim.allowAccess(defender) != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NotSiegableThere);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotSiegableThere);
                 return true;
             }
 
             //attacker must be close to the claim he wants to siege
             if (!defenderClaim.isNear(attacker.getLocation(), 25))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.SiegeTooFarAway);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.SiegeTooFarAway);
                 return true;
             }
 
             //claim can't be under siege already
             if (defenderClaim.siegeData != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.AlreadyUnderSiegeArea);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.AlreadyUnderSiegeArea);
                 return true;
             }
 
             //can't siege admin claims
             if (defenderClaim.isAdminClaim())
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NoSiegeAdminClaim);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoSiegeAdminClaim);
                 return true;
             }
 
             //can't be on cooldown
             if (dataStore.onCooldown(attacker, defender, defenderClaim))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.SiegeOnCooldown);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.SiegeOnCooldown);
                 return true;
             }
 
@@ -2626,8 +2637,8 @@ public class GriefPrevention extends JavaPlugin
             dataStore.startSiege(attacker, defender, defenderClaim);
 
             //confirmation message for attacker, warning message for defender
-            GriefPrevention.sendMessage(defender, TextMode.Warn, Messages.SiegeAlert, attacker.getName());
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.SiegeConfirmed, defender.getName());
+            EterniaKamui.sendMessage(defender, TextMode.Warn, Messages.SiegeAlert, attacker.getName());
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.SiegeConfirmed, defender.getName());
 
             return true;
         }
@@ -2640,7 +2651,7 @@ public class GriefPrevention extends JavaPlugin
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
             if (targetPlayer == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
@@ -2648,18 +2659,18 @@ public class GriefPrevention extends JavaPlugin
             boolean isMuted = this.dataStore.toggleSoftMute(targetPlayer.getUniqueId());
             if (isMuted)
             {
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.SoftMuted, targetPlayer.getName());
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.SoftMuted, targetPlayer.getName());
                 String executorName = "console";
                 if (player != null)
                 {
                     executorName = player.getName();
                 }
 
-                GriefPrevention.AddLogEntry(executorName + " muted " + targetPlayer.getName() + ".", CustomLogEntryTypes.AdminActivity, true);
+                EterniaKamui.AddLogEntry(executorName + " muted " + targetPlayer.getName() + ".", CustomLogEntryTypes.AdminActivity, true);
             }
             else
             {
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.UnSoftMuted, targetPlayer.getName());
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.UnSoftMuted, targetPlayer.getName());
             }
 
             return true;
@@ -2669,11 +2680,11 @@ public class GriefPrevention extends JavaPlugin
             this.loadConfig();
             if (player != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Success, "Configuration updated.  If you have updated your Grief Prevention JAR, you still need to /reload or reboot your server.");
+                EterniaKamui.sendMessage(player, TextMode.Success, "Configuration updated.  If you have updated your Grief Prevention JAR, you still need to /reload or reboot your server.");
             }
             else
             {
-                GriefPrevention.AddLogEntry("Configuration updated.  If you have updated your Grief Prevention JAR, you still need to /reload or reboot your server.");
+                EterniaKamui.AddLogEntry("Configuration updated.  If you have updated your Grief Prevention JAR, you still need to /reload or reboot your server.");
             }
 
             return true;
@@ -2691,7 +2702,7 @@ public class GriefPrevention extends JavaPlugin
             if (args[0].equalsIgnoreCase("cancel"))
             {
                 playerData.petGiveawayRecipient = null;
-                GriefPrevention.sendMessage(player, TextMode.Success, Messages.PetTransferCancellation);
+                EterniaKamui.sendMessage(player, TextMode.Success, Messages.PetTransferCancellation);
                 return true;
             }
 
@@ -2699,7 +2710,7 @@ public class GriefPrevention extends JavaPlugin
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
             if (targetPlayer == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
@@ -2707,7 +2718,7 @@ public class GriefPrevention extends JavaPlugin
             playerData.petGiveawayRecipient = targetPlayer;
 
             //send instructions
-            GriefPrevention.sendMessage(player, TextMode.Instr, Messages.ReadyToTransferPet);
+            EterniaKamui.sendMessage(player, TextMode.Instr, Messages.ReadyToTransferPet);
 
             return true;
         }
@@ -2718,7 +2729,7 @@ public class GriefPrevention extends JavaPlugin
             ItemStack inHand = player.getItemInHand();
             player.sendMessage("In Hand: " + String.format("%s(dValue:%s)", inHand.getType().name(), inHand.getData().getData()));
 
-            Block inWorld = GriefPrevention.getTargetNonAirBlock(player, 300);
+            Block inWorld = EterniaKamui.getTargetNonAirBlock(player, 300);
             player.sendMessage("In World: " + String.format("%s(dValue:%s)", inWorld.getType().name(), inWorld.getData()));
 
             return true;
@@ -2734,13 +2745,13 @@ public class GriefPrevention extends JavaPlugin
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
             if (targetPlayer == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
             this.setIgnoreStatus(player, targetPlayer, IgnoreMode.StandardIgnore);
 
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.IgnoreConfirmation);
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.IgnoreConfirmation);
 
             return true;
         }
@@ -2755,7 +2766,7 @@ public class GriefPrevention extends JavaPlugin
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
             if (targetPlayer == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
@@ -2763,13 +2774,13 @@ public class GriefPrevention extends JavaPlugin
             Boolean ignoreStatus = playerData.ignoredPlayers.get(targetPlayer.getUniqueId());
             if (ignoreStatus == null || ignoreStatus == true)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NotIgnoringPlayer);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotIgnoringPlayer);
                 return true;
             }
 
             this.setIgnoreStatus(player, targetPlayer, IgnoreMode.None);
 
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.UnIgnoreConfirmation);
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.UnIgnoreConfirmation);
 
             return true;
         }
@@ -2786,7 +2797,7 @@ public class GriefPrevention extends JavaPlugin
                     //if not an admin ignore, add it to the list
                     if (!entry.getValue())
                     {
-                        builder.append(GriefPrevention.lookupPlayerName(entry.getKey()));
+                        builder.append(EterniaKamui.lookupPlayerName(entry.getKey()));
                         builder.append(" ");
                     }
                 }
@@ -2795,11 +2806,11 @@ public class GriefPrevention extends JavaPlugin
             String list = builder.toString().trim();
             if (list.isEmpty())
             {
-                GriefPrevention.sendMessage(player, TextMode.Info, Messages.NotIgnoringAnyone);
+                EterniaKamui.sendMessage(player, TextMode.Info, Messages.NotIgnoringAnyone);
             }
             else
             {
-                GriefPrevention.sendMessage(player, TextMode.Info, list);
+                EterniaKamui.sendMessage(player, TextMode.Info, list);
             }
 
             return true;
@@ -2815,20 +2826,20 @@ public class GriefPrevention extends JavaPlugin
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
             if (targetPlayer == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
             OfflinePlayer targetPlayer2 = this.resolvePlayerByName(args[1]);
             if (targetPlayer2 == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
             this.setIgnoreStatus(targetPlayer, targetPlayer2, IgnoreMode.AdminIgnore);
 
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.SeparateConfirmation);
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.SeparateConfirmation);
 
             return true;
         }
@@ -2843,21 +2854,21 @@ public class GriefPrevention extends JavaPlugin
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
             if (targetPlayer == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
             OfflinePlayer targetPlayer2 = this.resolvePlayerByName(args[1]);
             if (targetPlayer2 == null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
             this.setIgnoreStatus(targetPlayer, targetPlayer2, IgnoreMode.None);
             this.setIgnoreStatus(targetPlayer2, targetPlayer, IgnoreMode.None);
 
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.UnSeparateConfirmation);
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.UnSeparateConfirmation);
 
             return true;
         }
@@ -2895,7 +2906,7 @@ public class GriefPrevention extends JavaPlugin
         }
         else
         {
-            return GriefPrevention.lookupPlayerName(entry);
+            return EterniaKamui.lookupPlayerName(entry);
         }
     }
 
@@ -2912,19 +2923,19 @@ public class GriefPrevention extends JavaPlugin
         Claim claim = this.dataStore.getClaimAt(player.getLocation(), true /*ignore height*/, null);
         if (claim == null)
         {
-            GriefPrevention.sendMessage(player, TextMode.Instr, Messages.AbandonClaimMissing);
+            EterniaKamui.sendMessage(player, TextMode.Instr, Messages.AbandonClaimMissing);
         }
 
         //verify ownership
         else if (claim.allowEdit(player) != null)
         {
-            GriefPrevention.sendMessage(player, TextMode.Err, Messages.NotYourClaim);
+            EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotYourClaim);
         }
 
         //warn if has children and we're not explicitly deleting a top level claim
         else if (claim.children.size() > 0 && !deleteTopLevelClaim)
         {
-            GriefPrevention.sendMessage(player, TextMode.Instr, Messages.DeleteTopLevelClaim);
+            EterniaKamui.sendMessage(player, TextMode.Instr, Messages.DeleteTopLevelClaim);
             return true;
         }
         else
@@ -2934,11 +2945,11 @@ public class GriefPrevention extends JavaPlugin
             this.dataStore.deleteClaim(claim, true, false);
 
             //if in a creative mode world, restore the claim area
-            if (GriefPrevention.instance.creativeRulesApply(claim.getLesserBoundaryCorner()))
+            if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()))
             {
-                GriefPrevention.AddLogEntry(player.getName() + " abandoned a claim @ " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()));
-                GriefPrevention.sendMessage(player, TextMode.Warn, Messages.UnclaimCleanupWarning);
-                GriefPrevention.instance.restoreClaim(claim, 20L * 60 * 2);
+                EterniaKamui.AddLogEntry(player.getName() + " abandoned a claim @ " + EterniaKamui.getfriendlyLocationString(claim.getLesserBoundaryCorner()));
+                EterniaKamui.sendMessage(player, TextMode.Warn, Messages.UnclaimCleanupWarning);
+                EterniaKamui.instance.restoreClaim(claim, 20L * 60 * 2);
             }
 
             //adjust claim blocks when abandoning a top level claim
@@ -2949,7 +2960,7 @@ public class GriefPrevention extends JavaPlugin
 
             //tell the player how many claim blocks he has left
             int remainingBlocks = playerData.getRemainingClaimBlocks();
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.AbandonSuccess, String.valueOf(remainingBlocks));
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.AbandonSuccess, String.valueOf(remainingBlocks));
 
             //revert any current visualization
             Visualization.Revert(player);
@@ -2976,7 +2987,7 @@ public class GriefPrevention extends JavaPlugin
             permission = recipientName.substring(1, recipientName.length() - 1);
             if (permission == null || permission.isEmpty())
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.InvalidPermissionID);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.InvalidPermissionID);
                 return;
             }
         }
@@ -2989,7 +3000,7 @@ public class GriefPrevention extends JavaPlugin
             otherPlayer = this.resolvePlayerByName(recipientName);
             if (otherPlayer == null && !recipientName.equals("public") && !recipientName.equals("all"))
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return;
             }
 
@@ -3019,7 +3030,7 @@ public class GriefPrevention extends JavaPlugin
             //check permission here
             if (claim.allowGrantPermission(player) != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.NoPermissionTrust, claim.getOwnerName());
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoPermissionTrust, claim.getOwnerName());
                 return;
             }
 
@@ -3055,7 +3066,7 @@ public class GriefPrevention extends JavaPlugin
             //error message for trying to grant a permission the player doesn't have
             if (errorMessage != null)
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.CantGrantThatPermission);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.CantGrantThatPermission);
                 return;
             }
 
@@ -3065,7 +3076,7 @@ public class GriefPrevention extends JavaPlugin
         //if we didn't determine which claims to modify, tell the player to be specific
         if (targetClaims.size() == 0)
         {
-            GriefPrevention.sendMessage(player, TextMode.Err, Messages.GrantPermissionNoClaim);
+            EterniaKamui.sendMessage(player, TextMode.Err, Messages.GrantPermissionNoClaim);
             return;
         }
 
@@ -3137,7 +3148,7 @@ public class GriefPrevention extends JavaPlugin
             location = this.dataStore.getMessage(Messages.LocationCurrentClaim);
         }
 
-        GriefPrevention.sendMessage(player, TextMode.Success, Messages.GrantPermissionConfirmation, recipientName, permissionDescription, location);
+        EterniaKamui.sendMessage(player, TextMode.Success, Messages.GrantPermissionConfirmation, recipientName, permissionDescription, location);
     }
 
     //helper method to resolve a player by name
@@ -3218,7 +3229,7 @@ public class GriefPrevention extends JavaPlugin
         if (playerID == null) return "somebody";
 
         //check the cache
-        OfflinePlayer player = GriefPrevention.instance.getServer().getOfflinePlayer(playerID);
+        OfflinePlayer player = EterniaKamui.instance.getServer().getOfflinePlayer(playerID);
         if (player.hasPlayedBefore() || player.isOnline())
         {
             return player.getName();
@@ -3233,8 +3244,8 @@ public class GriefPrevention extends JavaPlugin
     static void cacheUUIDNamePair(UUID playerID, String playerName)
     {
         //store the reverse mapping
-        GriefPrevention.instance.playerNameToIDMap.put(playerName, playerID);
-        GriefPrevention.instance.playerNameToIDMap.put(playerName.toLowerCase(), playerID);
+        EterniaKamui.instance.playerNameToIDMap.put(playerName, playerID);
+        EterniaKamui.instance.playerNameToIDMap.put(playerName.toLowerCase(), playerID);
     }
 
     //string overload for above helper
@@ -3247,7 +3258,7 @@ public class GriefPrevention extends JavaPlugin
         }
         catch (IllegalArgumentException ex)
         {
-            GriefPrevention.AddLogEntry("Error: Tried to look up a local player name for invalid UUID: " + playerID);
+            EterniaKamui.AddLogEntry("Error: Tried to look up a local player name for invalid UUID: " + playerID);
             return "someone";
         }
 
@@ -3290,14 +3301,14 @@ public class GriefPrevention extends JavaPlugin
         if (player.hasPermission("griefprevention.nopvpimmunity")) return;
 
         //check inventory for well, anything
-        if (GriefPrevention.isInventoryEmpty(player))
+        if (EterniaKamui.isInventoryEmpty(player))
         {
             //if empty, apply immunity
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.pvpImmune = true;
 
             //inform the player after he finishes respawning
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.PvPImmunityStart, 5L);
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.PvPImmunityStart, 5L);
 
             //start a task to re-check this player's inventory every minute until his immunity is gone
             PvPImmunityValidationTask task = new PvPImmunityValidationTask(player);
@@ -3340,7 +3351,7 @@ public class GriefPrevention extends JavaPlugin
         while (true)
         {
             Claim claim = null;
-            claim = GriefPrevention.instance.dataStore.getClaimAt(candidateLocation, false, null);
+            claim = EterniaKamui.instance.dataStore.getClaimAt(candidateLocation, false, null);
 
             //if there's a claim here, keep looking
             if (claim != null)
@@ -3379,7 +3390,7 @@ public class GriefPrevention extends JavaPlugin
     //sends a color-coded message to a player
     public static void sendMessage(Player player, ChatColor color, Messages messageID, long delayInTicks, String... args)
     {
-        String message = GriefPrevention.instance.dataStore.getMessage(messageID, args);
+        String message = EterniaKamui.instance.dataStore.getMessage(messageID, args);
         sendMessage(player, color, message, delayInTicks);
     }
 
@@ -3390,7 +3401,7 @@ public class GriefPrevention extends JavaPlugin
 
         if (player == null)
         {
-            GriefPrevention.AddLogEntry(color + message);
+            EterniaKamui.AddLogEntry(color + message);
         }
         else
         {
@@ -3405,7 +3416,7 @@ public class GriefPrevention extends JavaPlugin
         //Only schedule if there should be a delay. Otherwise, send the message right now, else the message will appear out of order.
         if (delayInTicks > 0)
         {
-            GriefPrevention.instance.getServer().getScheduler().runTaskLater(GriefPrevention.instance, task, delayInTicks);
+            EterniaKamui.instance.getServer().getScheduler().runTaskLater(EterniaKamui.instance, task, delayInTicks);
         }
         else
         {
@@ -3435,7 +3446,7 @@ public class GriefPrevention extends JavaPlugin
 
     public String allowBuild(Player player, Location location, Material material)
     {
-        if (!GriefPrevention.instance.claimsEnabledForWorld(location.getWorld())) return null;
+        if (!EterniaKamui.instance.claimsEnabledForWorld(location.getWorld())) return null;
 
         PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
         Claim claim = this.dataStore.getClaimAt(location, false, playerData.lastClaim);
@@ -3450,7 +3461,7 @@ public class GriefPrevention extends JavaPlugin
             if (this.creativeRulesApply(location) || this.config_claims_worldModes.get(location.getWorld()) == ClaimsMode.SurvivalRequiringClaims)
             {
                 //exception: when chest claims are enabled, players who have zero land claims and are placing a chest
-                if (material != Material.CHEST || playerData.getClaims().size() > 0 || GriefPrevention.instance.config_claims_automaticClaimsForNewPlayersRadius == -1)
+                if (material != Material.CHEST || playerData.getClaims().size() > 0 || EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius == -1)
                 {
                     String reason = this.dataStore.getMessage(Messages.NoBuildOutsideClaims);
                     if (player.hasPermission("griefprevention.ignoreclaims"))
@@ -3487,7 +3498,7 @@ public class GriefPrevention extends JavaPlugin
 
     public String allowBreak(Player player, Block block, Location location, BlockBreakEvent breakEvent)
     {
-        if (!GriefPrevention.instance.claimsEnabledForWorld(location.getWorld())) return null;
+        if (!EterniaKamui.instance.claimsEnabledForWorld(location.getWorld())) return null;
 
         PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
         Claim claim = this.dataStore.getClaimAt(location, false, playerData.lastClaim);
@@ -3579,8 +3590,8 @@ public class GriefPrevention extends JavaPlugin
 
         //create task
         //when done processing, this task will create a main thread task to actually update the world with processing results
-        RestoreNatureProcessingTask task = new RestoreNatureProcessingTask(snapshots, miny, chunk.getWorld().getEnvironment(), lesserBoundaryCorner.getBlock().getBiome(), lesserBoundaryCorner, greaterBoundaryCorner, this.getSeaLevel(chunk.getWorld()), aggressiveMode, GriefPrevention.instance.creativeRulesApply(lesserBoundaryCorner), playerReceivingVisualization);
-        GriefPrevention.instance.getServer().getScheduler().runTaskLaterAsynchronously(GriefPrevention.instance, task, delayInTicks);
+        RestoreNatureProcessingTask task = new RestoreNatureProcessingTask(snapshots, miny, chunk.getWorld().getEnvironment(), lesserBoundaryCorner.getBlock().getBiome(), lesserBoundaryCorner, greaterBoundaryCorner, this.getSeaLevel(chunk.getWorld()), aggressiveMode, EterniaKamui.instance.creativeRulesApply(lesserBoundaryCorner), playerReceivingVisualization);
+        EterniaKamui.instance.getServer().getScheduler().runTaskLaterAsynchronously(EterniaKamui.instance, task, delayInTicks);
     }
 
     private void parseMaterialListFromConfig(List<String> stringsToParse, MaterialCollection materialCollection)
@@ -3597,7 +3608,7 @@ public class GriefPrevention extends JavaPlugin
             if (materialInfo == null)
             {
                 //show error in log
-                GriefPrevention.AddLogEntry("ERROR: Unable to read a material entry from the config file.  Please update your config.yml.");
+                EterniaKamui.AddLogEntry("ERROR: Unable to read a material entry from the config file.  Please update your config.yml.");
 
                 //update string, which will go out to config file to help user find the error entry
                 if (!stringsToParse.get(i).contains("can't"))
@@ -3650,7 +3661,7 @@ public class GriefPrevention extends JavaPlugin
         if (matcher.find())
         {
             //and it's not in the list of allowed IP addresses
-            if (!GriefPrevention.instance.config_spam_allowedIpAddresses.contains(matcher.group()))
+            if (!EterniaKamui.instance.config_spam_allowedIpAddresses.contains(matcher.group()))
             {
                 return true;
             }
@@ -3677,7 +3688,7 @@ public class GriefPrevention extends JavaPlugin
             }
         }
 
-        Bukkit.getScheduler().runTaskAsynchronously(GriefPrevention.instance, new AutoExtendClaimTask(newClaim, snapshots, world.getEnvironment()));
+        Bukkit.getScheduler().runTaskAsynchronously(EterniaKamui.instance, new AutoExtendClaimTask(newClaim, snapshots, world.getEnvironment()));
     }
 
     public boolean pvpRulesApply(World world)
@@ -3704,11 +3715,11 @@ public class GriefPrevention extends JavaPlugin
 
     static void banPlayer(Player player, String reason, String source)
     {
-        if (GriefPrevention.instance.config_ban_useCommand)
+        if (EterniaKamui.instance.config_ban_useCommand)
         {
             Bukkit.getServer().dispatchCommand(
                     Bukkit.getConsoleSender(),
-                    GriefPrevention.instance.config_ban_commandFormat.replace("%name%", player.getName()).replace("%reason%", reason));
+                    EterniaKamui.instance.config_ban_commandFormat.replace("%name%", player.getName()).replace("%reason%", reason));
         }
         else
         {
@@ -3733,9 +3744,9 @@ public class GriefPrevention extends JavaPlugin
     {
         if (claim.siegeData != null)
             return false;
-        return claim.isAdminClaim() && claim.parent == null && GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims ||
-                claim.isAdminClaim() && claim.parent != null && GriefPrevention.instance.config_pvp_noCombatInAdminSubdivisions ||
-                !claim.isAdminClaim() && GriefPrevention.instance.config_pvp_noCombatInPlayerLandClaims;
+        return claim.isAdminClaim() && claim.parent == null && EterniaKamui.instance.config_pvp_noCombatInAdminLandClaims ||
+                claim.isAdminClaim() && claim.parent != null && EterniaKamui.instance.config_pvp_noCombatInAdminSubdivisions ||
+                !claim.isAdminClaim() && EterniaKamui.instance.config_pvp_noCombatInPlayerLandClaims;
     }
 
     /*
@@ -3800,7 +3811,7 @@ public class GriefPrevention extends JavaPlugin
     public void startRescueTask(Player player, Location location)
     {
         //Schedule task to reset player's portal cooldown after 30 seconds (Maximum timeout time for client, in case their network is slow and taking forever to load chunks)
-        BukkitTask task = new CheckForPortalTrapTask(player, this, location).runTaskLater(GriefPrevention.instance, 600L);
+        BukkitTask task = new CheckForPortalTrapTask(player, this, location).runTaskLater(EterniaKamui.instance, 600L);
 
         //Cancel existing rescue task
         if (portalReturnTaskMap.containsKey(player.getUniqueId()))

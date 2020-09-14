@@ -107,10 +107,10 @@ public class EntityEventHandler implements Listener
 {
     //convenience reference for the singleton datastore
     private DataStore dataStore;
-    GriefPrevention instance;
+    EterniaKamui instance;
     private final NamespacedKey luredByPlayer;
 
-    public EntityEventHandler(DataStore dataStore, GriefPrevention plugin)
+    public EntityEventHandler(DataStore dataStore, EterniaKamui plugin)
     {
         this.dataStore = dataStore;
         instance = plugin;
@@ -124,7 +124,7 @@ public class EntityEventHandler implements Listener
         if (entity.getType() == EntityType.PLAYER)
         {
             Player player = (Player) event.getEntity();
-            String noBuildReason = GriefPrevention.instance.allowBuild(player, event.getBlock().getLocation(), event.getNewState().getType());
+            String noBuildReason = EterniaKamui.instance.allowBuild(player, event.getBlock().getLocation(), event.getNewState().getType());
             if (noBuildReason != null)
             {
                 event.setCancelled(true);
@@ -136,35 +136,35 @@ public class EntityEventHandler implements Listener
     public void onLightningStrike(LightningStrikeEvent event)
     {
         if (event.getCause() == LightningStrikeEvent.Cause.TRIDENT)
-            event.getLightning().setMetadata("GP_TRIDENT", new FixedMetadataValue(GriefPrevention.instance, event.getLightning().getLocation()));
+            event.getLightning().setMetadata("GP_TRIDENT", new FixedMetadataValue(EterniaKamui.instance, event.getLightning().getLocation()));
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
     public void onEntityChangeBLock(EntityChangeBlockEvent event)
     {
-        if (!GriefPrevention.instance.config_endermenMoveBlocks && event.getEntityType() == EntityType.ENDERMAN)
+        if (!EterniaKamui.instance.config_endermenMoveBlocks && event.getEntityType() == EntityType.ENDERMAN)
         {
             event.setCancelled(true);
         }
-        else if (!GriefPrevention.instance.config_silverfishBreakBlocks && event.getEntityType() == EntityType.SILVERFISH)
+        else if (!EterniaKamui.instance.config_silverfishBreakBlocks && event.getEntityType() == EntityType.SILVERFISH)
         {
             event.setCancelled(true);
         }
-        else if (!GriefPrevention.instance.config_rabbitsEatCrops && event.getEntityType() == EntityType.RABBIT)
+        else if (!EterniaKamui.instance.config_rabbitsEatCrops && event.getEntityType() == EntityType.RABBIT)
         {
             event.setCancelled(true);
         }
-        else if (GriefPrevention.instance.config_claims_worldModes.get(event.getBlock().getWorld()) != ClaimsMode.Disabled)
+        else if (EterniaKamui.instance.config_claims_worldModes.get(event.getBlock().getWorld()) != ClaimsMode.Disabled)
         {
             if (event.getEntityType() == EntityType.WITHER)
             {
                 Claim claim = this.dataStore.getClaimAt(event.getBlock().getLocation(), false, null);
-                if (claim == null || !claim.areExplosivesAllowed || !GriefPrevention.instance.config_blockClaimExplosions)
+                if (claim == null || !claim.areExplosivesAllowed || !EterniaKamui.instance.config_blockClaimExplosions)
                 {
                     event.setCancelled(true);
                 }
             }
-            else if (!GriefPrevention.instance.config_claims_ravagersBreakBlocks && event.getEntityType() == EntityType.RAVAGER)
+            else if (!EterniaKamui.instance.config_claims_ravagersBreakBlocks && event.getEntityType() == EntityType.RAVAGER)
             {
                 event.setCancelled(true);
             }
@@ -180,7 +180,7 @@ public class EntityEventHandler implements Listener
                 {
                     Player player = (Player) event.getEntity();
                     Block block = event.getBlock();
-                    if (GriefPrevention.instance.allowBreak(player, block, block.getLocation()) != null)
+                    if (EterniaKamui.instance.allowBreak(player, block, block.getLocation()) != null)
                     {
                         event.setCancelled(true);
                     }
@@ -195,7 +195,7 @@ public class EntityEventHandler implements Listener
             if (driver instanceof Player)
             {
                 Block block = event.getBlock();
-                if (GriefPrevention.instance.allowBreak((Player) driver, block, block.getLocation()) != null)
+                if (EterniaKamui.instance.allowBreak((Player) driver, block, block.getLocation()) != null)
                 {
                     event.setCancelled(true);
                 }
@@ -211,7 +211,7 @@ public class EntityEventHandler implements Listener
             //if changing a block TO air, this is when the falling block formed.  note its original location
             if (event.getTo() == Material.AIR)
             {
-                entity.setMetadata("GP_FALLINGBLOCK", new FixedMetadataValue(GriefPrevention.instance, block.getLocation()));
+                entity.setMetadata("GP_FALLINGBLOCK", new FixedMetadataValue(EterniaKamui.instance, block.getLocation()));
             }
             //otherwise, the falling block is forming a block.  compare new location to original source
             else
@@ -228,7 +228,7 @@ public class EntityEventHandler implements Listener
                 if (originalLocation.getBlockX() != newLocation.getBlockX() || originalLocation.getBlockZ() != newLocation.getBlockZ())
                 {
                     //in creative mode worlds, never form the block
-                    if (GriefPrevention.instance.config_claims_worldModes.get(newLocation.getWorld()) == ClaimsMode.Creative)
+                    if (EterniaKamui.instance.config_claims_worldModes.get(newLocation.getWorld()) == ClaimsMode.Creative)
                     {
                         event.setCancelled(true);
                         return;
@@ -276,7 +276,7 @@ public class EntityEventHandler implements Listener
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
     public void onZombieBreakDoor(EntityBreakDoorEvent event)
     {
-        if (!GriefPrevention.instance.config_zombiesBreakDoors) event.setCancelled(true);
+        if (!EterniaKamui.instance.config_zombiesBreakDoors) event.setCancelled(true);
     }
 
     //don't allow entities to trample crops
@@ -286,7 +286,7 @@ public class EntityEventHandler implements Listener
         Material material = event.getBlock().getType();
         if (material == Material.FARMLAND)
         {
-            if (!GriefPrevention.instance.config_creaturesTrampleCrops)
+            if (!EterniaKamui.instance.config_creaturesTrampleCrops)
             {
                 event.setCancelled(true);
             }
@@ -321,15 +321,15 @@ public class EntityEventHandler implements Listener
         //only applies to claims-enabled worlds
         World world = location.getWorld();
 
-        if (!GriefPrevention.instance.claimsEnabledForWorld(world)) return;
+        if (!EterniaKamui.instance.claimsEnabledForWorld(world)) return;
 
         //FEATURE: explosions don't destroy surface blocks by default
         boolean isCreeper = (entity != null && entity.getType() == EntityType.CREEPER);
 
-        boolean applySurfaceRules = world.getEnvironment() == Environment.NORMAL && ((isCreeper && GriefPrevention.instance.config_blockSurfaceCreeperExplosions) || (!isCreeper && GriefPrevention.instance.config_blockSurfaceOtherExplosions));
+        boolean applySurfaceRules = world.getEnvironment() == Environment.NORMAL && ((isCreeper && EterniaKamui.instance.config_blockSurfaceCreeperExplosions) || (!isCreeper && EterniaKamui.instance.config_blockSurfaceOtherExplosions));
 
         //special rule for creative worlds: explosions don't destroy anything
-        if (GriefPrevention.instance.creativeRulesApply(location))
+        if (EterniaKamui.instance.creativeRulesApply(location))
         {
             for (int i = 0; i < blocks.size(); i++)
             {
@@ -359,7 +359,7 @@ public class EntityEventHandler implements Listener
             }
 
             //if yes, apply claim exemptions if they should apply
-            if (claim != null && (claim.areExplosivesAllowed || !GriefPrevention.instance.config_blockClaimExplosions))
+            if (claim != null && (claim.areExplosivesAllowed || !EterniaKamui.instance.config_blockClaimExplosions))
             {
                 explodedBlocks.add(block);
                 continue;
@@ -370,9 +370,9 @@ public class EntityEventHandler implements Listener
             {
                 Material material = block.getType();
                 boolean breakable = false;
-                for (int j = 0; j < GriefPrevention.instance.config_siege_blocks.size(); j++)
+                for (int j = 0; j < EterniaKamui.instance.config_siege_blocks.size(); j++)
                 {
-                    Material breakableMaterial = GriefPrevention.instance.config_siege_blocks.get(j);
+                    Material breakableMaterial = EterniaKamui.instance.config_siege_blocks.get(j);
                     if (breakableMaterial == material)
                     {
                         breakable = true;
@@ -387,7 +387,7 @@ public class EntityEventHandler implements Listener
             //if no, then also consider surface rules
             if (claim == null)
             {
-                if (!applySurfaceRules || block.getLocation().getBlockY() < GriefPrevention.instance.getSeaLevel(world) - 7)
+                if (!applySurfaceRules || block.getLocation().getBlockY() < EterniaKamui.instance.getSeaLevel(world) - 7)
                 {
                     explodedBlocks.add(block);
                 }
@@ -404,13 +404,13 @@ public class EntityEventHandler implements Listener
     public void onItemSpawn(ItemSpawnEvent event)
     {
         //if in a creative world, cancel the event (don't drop items on the ground)
-        if (GriefPrevention.instance.creativeRulesApply(event.getLocation()))
+        if (EterniaKamui.instance.creativeRulesApply(event.getLocation()))
         {
             event.setCancelled(true);
         }
 
         //if item is on watch list, apply protection
-        ArrayList<PendingItemProtection> watchList = GriefPrevention.instance.pendingItemWatchList;
+        ArrayList<PendingItemProtection> watchList = EterniaKamui.instance.pendingItemWatchList;
         Item newItem = event.getEntity();
         Long now = null;
         for (int i = 0; i < watchList.size(); i++)
@@ -445,7 +445,7 @@ public class EntityEventHandler implements Listener
             }
 
             //otherwise, mark item with protection information
-            newItem.setMetadata("GP_ITEMOWNER", new FixedMetadataValue(GriefPrevention.instance, pendingProtection.owner));
+            newItem.setMetadata("GP_ITEMOWNER", new FixedMetadataValue(EterniaKamui.instance, pendingProtection.owner));
 
             //and remove pending protection data
             watchList.remove(i);
@@ -458,7 +458,7 @@ public class EntityEventHandler implements Listener
     public void onExpBottle(ExpBottleEvent event)
     {
         //if in a creative world, cancel the event (don't drop exp on the ground)
-        if (GriefPrevention.instance.creativeRulesApply(event.getEntity().getLocation()))
+        if (EterniaKamui.instance.creativeRulesApply(event.getEntity().getLocation()))
         {
             event.setExperience(0);
         }
@@ -469,7 +469,7 @@ public class EntityEventHandler implements Listener
     public void onEntitySpawn(CreatureSpawnEvent event)
     {
         //these rules apply only to creative worlds
-        if (!GriefPrevention.instance.creativeRulesApply(event.getLocation())) return;
+        if (!EterniaKamui.instance.creativeRulesApply(event.getLocation())) return;
 
         //chicken eggs and breeding could potentially make a mess in the wilderness, once griefers get involved
         SpawnReason reason = event.getSpawnReason();
@@ -495,10 +495,10 @@ public class EntityEventHandler implements Listener
         LivingEntity entity = event.getEntity();
 
         //don't do the rest in worlds where claims are not enabled
-        if (!GriefPrevention.instance.claimsEnabledForWorld(entity.getWorld())) return;
+        if (!EterniaKamui.instance.claimsEnabledForWorld(entity.getWorld())) return;
 
         //special rule for creative worlds: killed entities don't drop items or experience orbs
-        if (GriefPrevention.instance.creativeRulesApply(entity.getLocation()))
+        if (EterniaKamui.instance.creativeRulesApply(entity.getLocation()))
         {
             event.setDroppedExp(0);
             event.getDrops().clear();
@@ -524,9 +524,9 @@ public class EntityEventHandler implements Listener
         World world = entity.getWorld();
 
         //decide whether or not to apply this feature to this situation (depends on the world where it happens)
-        boolean isPvPWorld = GriefPrevention.instance.pvpRulesApply(world);
-        if ((isPvPWorld && GriefPrevention.instance.config_lockDeathDropsInPvpWorlds) ||
-                (!isPvPWorld && GriefPrevention.instance.config_lockDeathDropsInNonPvpWorlds))
+        boolean isPvPWorld = EterniaKamui.instance.pvpRulesApply(world);
+        if ((isPvPWorld && EterniaKamui.instance.config_lockDeathDropsInPvpWorlds) ||
+                (!isPvPWorld && EterniaKamui.instance.config_lockDeathDropsInNonPvpWorlds))
         {
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), false, playerData.lastClaim);
             ProtectDeathDropsEvent protectionEvent = new ProtectDeathDropsEvent(claim);
@@ -540,7 +540,7 @@ public class EntityEventHandler implements Listener
                 List<ItemStack> drops = event.getDrops();
                 for (ItemStack stack : drops)
                 {
-                    GriefPrevention.instance.pendingItemWatchList.add(
+                    EterniaKamui.instance.pendingItemWatchList.add(
                             new PendingItemProtection(deathLocation, playerID, expirationTime, stack));
                 }
 
@@ -582,7 +582,7 @@ public class EntityEventHandler implements Listener
     public void onHangingBreak(HangingBreakEvent event)
     {
         //don't track in worlds where claims are not enabled
-        if (!GriefPrevention.instance.claimsEnabledForWorld(event.getEntity().getWorld())) return;
+        if (!EterniaKamui.instance.claimsEnabledForWorld(event.getEntity().getWorld())) return;
 
         //Ignore cases where itemframes should break due to no supporting blocks
         if (event.getCause() == RemoveCause.PHYSICS) return;
@@ -617,11 +617,11 @@ public class EntityEventHandler implements Listener
 
         //if the player doesn't have build permission, don't allow the breakage
         Player playerRemover = (Player) entityEvent.getRemover();
-        String noBuildReason = GriefPrevention.instance.allowBuild(playerRemover, event.getEntity().getLocation(), Material.AIR);
+        String noBuildReason = EterniaKamui.instance.allowBuild(playerRemover, event.getEntity().getLocation(), Material.AIR);
         if (noBuildReason != null)
         {
             event.setCancelled(true);
-            GriefPrevention.sendMessage(playerRemover, TextMode.Err, noBuildReason);
+            EterniaKamui.sendMessage(playerRemover, TextMode.Err, noBuildReason);
         }
     }
 
@@ -630,21 +630,21 @@ public class EntityEventHandler implements Listener
     public void onPaintingPlace(HangingPlaceEvent event)
     {
         //don't track in worlds where claims are not enabled
-        if (!GriefPrevention.instance.claimsEnabledForWorld(event.getBlock().getWorld())) return;
+        if (!EterniaKamui.instance.claimsEnabledForWorld(event.getBlock().getWorld())) return;
 
         //FEATURE: similar to above, placing a painting requires build permission in the claim
 
         //if the player doesn't have permission, don't allow the placement
-        String noBuildReason = GriefPrevention.instance.allowBuild(event.getPlayer(), event.getEntity().getLocation(), Material.PAINTING);
+        String noBuildReason = EterniaKamui.instance.allowBuild(event.getPlayer(), event.getEntity().getLocation(), Material.PAINTING);
         if (noBuildReason != null)
         {
             event.setCancelled(true);
-            GriefPrevention.sendMessage(event.getPlayer(), TextMode.Err, noBuildReason);
+            EterniaKamui.sendMessage(event.getPlayer(), TextMode.Err, noBuildReason);
             return;
         }
 
         //otherwise, apply entity-count limitations for creative worlds
-        else if (GriefPrevention.instance.creativeRulesApply(event.getEntity().getLocation()))
+        else if (EterniaKamui.instance.creativeRulesApply(event.getEntity().getLocation()))
         {
             PlayerData playerData = this.dataStore.getPlayerData(event.getPlayer().getUniqueId());
             Claim claim = this.dataStore.getClaimAt(event.getBlock().getLocation(), false, playerData.lastClaim);
@@ -653,7 +653,7 @@ public class EntityEventHandler implements Listener
             String noEntitiesReason = claim.allowMoreEntities(false);
             if (noEntitiesReason != null)
             {
-                GriefPrevention.sendMessage(event.getPlayer(), TextMode.Err, noEntitiesReason);
+                EterniaKamui.sendMessage(event.getPlayer(), TextMode.Err, noEntitiesReason);
                 event.setCancelled(true);
                 return;
             }
@@ -687,7 +687,7 @@ public class EntityEventHandler implements Listener
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onEntityTarget(EntityTargetEvent event)
     {
-        if (!GriefPrevention.instance.claimsEnabledForWorld(event.getEntity().getWorld())) return;
+        if (!EterniaKamui.instance.claimsEnabledForWorld(event.getEntity().getWorld())) return;
 
         EntityType entityType = event.getEntityType();
         if (entityType != EntityType.HOGLIN && entityType != EntityType.POLAR_BEAR)
@@ -725,10 +725,10 @@ public class EntityEventHandler implements Listener
         if (isMonster(event.getEntity())) return;
 
         //horse protections can be disabled
-        if (event.getEntity() instanceof Horse && !GriefPrevention.instance.config_claims_protectHorses) return;
-        if (event.getEntity() instanceof Donkey && !GriefPrevention.instance.config_claims_protectDonkeys) return;
-        if (event.getEntity() instanceof Mule && !GriefPrevention.instance.config_claims_protectDonkeys) return;
-        if (event.getEntity() instanceof Llama && !GriefPrevention.instance.config_claims_protectLlamas) return;
+        if (event.getEntity() instanceof Horse && !EterniaKamui.instance.config_claims_protectHorses) return;
+        if (event.getEntity() instanceof Donkey && !EterniaKamui.instance.config_claims_protectDonkeys) return;
+        if (event.getEntity() instanceof Mule && !EterniaKamui.instance.config_claims_protectDonkeys) return;
+        if (event.getEntity() instanceof Llama && !EterniaKamui.instance.config_claims_protectLlamas) return;
         //protected death loot can't be destroyed, only picked up or despawned due to expiration
         if (event.getEntityType() == EntityType.DROPPED_ITEM)
         {
@@ -739,7 +739,7 @@ public class EntityEventHandler implements Listener
         }
 
         //protect pets from environmental damage types which could be easily caused by griefers
-        if (event.getEntity() instanceof Tameable && !GriefPrevention.instance.pvpRulesApply(event.getEntity().getWorld()))
+        if (event.getEntity() instanceof Tameable && !EterniaKamui.instance.pvpRulesApply(event.getEntity().getWorld()))
         {
             Tameable tameable = (Tameable) event.getEntity();
             if (tameable.isTamed())
@@ -806,13 +806,13 @@ public class EntityEventHandler implements Listener
             }
 
             //protect players from lingering potion damage when protected from pvp
-            if (damageSource.getType() == EntityType.AREA_EFFECT_CLOUD && event.getEntityType() == EntityType.PLAYER && GriefPrevention.instance.pvpRulesApply(event.getEntity().getWorld()))
+            if (damageSource.getType() == EntityType.AREA_EFFECT_CLOUD && event.getEntityType() == EntityType.PLAYER && EterniaKamui.instance.pvpRulesApply(event.getEntity().getWorld()))
             {
                 Player damaged = (Player) event.getEntity();
-                PlayerData damagedData = GriefPrevention.instance.dataStore.getPlayerData(damaged.getUniqueId());
+                PlayerData damagedData = EterniaKamui.instance.dataStore.getPlayerData(damaged.getUniqueId());
 
                 //case 1: recently spawned
-                if (GriefPrevention.instance.config_pvp_protectFreshSpawns && damagedData.pvpImmune)
+                if (EterniaKamui.instance.config_pvp_protectFreshSpawns && damagedData.pvpImmune)
                 {
                     event.setCancelled(true);
                     return;
@@ -821,11 +821,11 @@ public class EntityEventHandler implements Listener
                 //case 2: in a pvp safe zone
                 else
                 {
-                    Claim damagedClaim = GriefPrevention.instance.dataStore.getClaimAt(damaged.getLocation(), false, damagedData.lastClaim);
+                    Claim damagedClaim = EterniaKamui.instance.dataStore.getClaimAt(damaged.getLocation(), false, damagedData.lastClaim);
                     if (damagedClaim != null)
                     {
                         damagedData.lastClaim = damagedClaim;
-                        if (GriefPrevention.instance.claimIsPvPSafeZone(damagedClaim))
+                        if (EterniaKamui.instance.claimIsPvPSafeZone(damagedClaim))
                         {
                             PreventPvPEvent pvpEvent = new PreventPvPEvent(damagedClaim);
                             Bukkit.getPluginManager().callEvent(pvpEvent);
@@ -841,7 +841,7 @@ public class EntityEventHandler implements Listener
         }
 
         //if the attacker is a firework from a crossbow by a player and defender is a player (nonpvp)
-        if (firework != null && event.getEntityType() == EntityType.PLAYER && !GriefPrevention.instance.pvpRulesApply(attacker.getWorld()))
+        if (firework != null && event.getEntityType() == EntityType.PLAYER && !EterniaKamui.instance.pvpRulesApply(attacker.getWorld()))
         {
             Player defender = (Player) (event.getEntity());
             if (attacker != defender)
@@ -853,7 +853,7 @@ public class EntityEventHandler implements Listener
 
 
         //if the attacker is a player and defender is a player (pvp combat)
-        if (attacker != null && event.getEntityType() == EntityType.PLAYER && GriefPrevention.instance.pvpRulesApply(attacker.getWorld()))
+        if (attacker != null && event.getEntityType() == EntityType.PLAYER && EterniaKamui.instance.pvpRulesApply(attacker.getWorld()))
         {
             //FEATURE: prevent pvp in the first minute after spawn, and prevent pvp when one or both players have no inventory
 
@@ -865,13 +865,13 @@ public class EntityEventHandler implements Listener
                 PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
 
                 //otherwise if protecting spawning players
-                if (GriefPrevention.instance.config_pvp_protectFreshSpawns)
+                if (EterniaKamui.instance.config_pvp_protectFreshSpawns)
                 {
                     if (defenderData.pvpImmune)
                     {
                         event.setCancelled(true);
                         if (sendErrorMessagesToPlayers)
-                            GriefPrevention.sendMessage(attacker, TextMode.Err, Messages.ThatPlayerPvPImmune);
+                            EterniaKamui.sendMessage(attacker, TextMode.Err, Messages.ThatPlayerPvPImmune);
                         return;
                     }
 
@@ -879,20 +879,20 @@ public class EntityEventHandler implements Listener
                     {
                         event.setCancelled(true);
                         if (sendErrorMessagesToPlayers)
-                            GriefPrevention.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
+                            EterniaKamui.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
                         return;
                     }
                 }
 
                 //FEATURE: prevent players from engaging in PvP combat inside land claims (when it's disabled)
-                if (GriefPrevention.instance.config_pvp_noCombatInPlayerLandClaims || GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims)
+                if (EterniaKamui.instance.config_pvp_noCombatInPlayerLandClaims || EterniaKamui.instance.config_pvp_noCombatInAdminLandClaims)
                 {
                     Claim attackerClaim = this.dataStore.getClaimAt(attacker.getLocation(), false, attackerData.lastClaim);
                     if (!attackerData.ignoreClaims)
                     {
                         if (attackerClaim != null && //ignore claims mode allows for pvp inside land claims
                                 !attackerData.inPvpCombat() &&
-                                GriefPrevention.instance.claimIsPvPSafeZone(attackerClaim))
+                                EterniaKamui.instance.claimIsPvPSafeZone(attackerClaim))
                         {
                             attackerData.lastClaim = attackerClaim;
                             PreventPvPEvent pvpEvent = new PreventPvPEvent(attackerClaim);
@@ -901,7 +901,7 @@ public class EntityEventHandler implements Listener
                             {
                                 event.setCancelled(true);
                                 if (sendErrorMessagesToPlayers)
-                                    GriefPrevention.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
+                                    EterniaKamui.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
                             }
                             return;
                         }
@@ -909,7 +909,7 @@ public class EntityEventHandler implements Listener
                         Claim defenderClaim = this.dataStore.getClaimAt(defender.getLocation(), false, defenderData.lastClaim);
                         if (defenderClaim != null &&
                                 !defenderData.inPvpCombat() &&
-                                GriefPrevention.instance.claimIsPvPSafeZone(defenderClaim))
+                                EterniaKamui.instance.claimIsPvPSafeZone(defenderClaim))
                         {
                             defenderData.lastClaim = defenderClaim;
                             PreventPvPEvent pvpEvent = new PreventPvPEvent(defenderClaim);
@@ -918,7 +918,7 @@ public class EntityEventHandler implements Listener
                             {
                                 event.setCancelled(true);
                                 if (sendErrorMessagesToPlayers)
-                                    GriefPrevention.sendMessage(attacker, TextMode.Err, Messages.PlayerInPvPSafeZone);
+                                    EterniaKamui.sendMessage(attacker, TextMode.Err, Messages.PlayerInPvPSafeZone);
                             }
                             return;
                         }
@@ -930,7 +930,7 @@ public class EntityEventHandler implements Listener
         if (event instanceof EntityDamageByEntityEvent)
         {
             //don't track in worlds where claims are not enabled
-            if (!GriefPrevention.instance.claimsEnabledForWorld(event.getEntity().getWorld())) return;
+            if (!EterniaKamui.instance.claimsEnabledForWorld(event.getEntity().getWorld())) return;
 
             //protect players from being attacked by other players' pets when protected from pvp
             if (event.getEntityType() == EntityType.PLAYER)
@@ -945,14 +945,14 @@ public class EntityEventHandler implements Listener
                     if (pet.isTamed() && pet.getOwner() != null)
                     {
                         //if defender is NOT in pvp combat and not immune to pvp right now due to recent respawn
-                        PlayerData defenderData = GriefPrevention.instance.dataStore.getPlayerData(event.getEntity().getUniqueId());
+                        PlayerData defenderData = EterniaKamui.instance.dataStore.getPlayerData(event.getEntity().getUniqueId());
                         if (!defenderData.pvpImmune && !defenderData.inPvpCombat())
                         {
                             //if defender is not in a protected area
                             Claim defenderClaim = this.dataStore.getClaimAt(defender.getLocation(), false, defenderData.lastClaim);
                             if (defenderClaim != null &&
                                     !defenderData.inPvpCombat() &&
-                                    GriefPrevention.instance.claimIsPvPSafeZone(defenderClaim))
+                                    EterniaKamui.instance.claimIsPvPSafeZone(defenderClaim))
                             {
                                 defenderData.lastClaim = defenderClaim;
                                 PreventPvPEvent pvpEvent = new PreventPvPEvent(defenderClaim);
@@ -978,7 +978,7 @@ public class EntityEventHandler implements Listener
                     || subEvent.getEntityType() == EntityType.ENDER_CRYSTAL)
             {
                 //allow for disabling villager protections in the config
-                if (subEvent.getEntityType() == EntityType.VILLAGER && !GriefPrevention.instance.config_claims_protectCreatures)
+                if (subEvent.getEntityType() == EntityType.VILLAGER && !EterniaKamui.instance.config_claims_protectCreatures)
                     return;
 
                 //don't protect polar bears, they may be aggressive
@@ -1017,14 +1017,14 @@ public class EntityEventHandler implements Listener
                     {
                         event.setCancelled(true);
                         if (sendErrorMessagesToPlayers)
-                            GriefPrevention.sendMessage(attacker, TextMode.Err, failureReason);
+                            EterniaKamui.sendMessage(attacker, TextMode.Err, failureReason);
                         return;
                     }
                 }
             }
 
             //if the entity is an non-monster creature (remember monsters disqualified above), or a vehicle
-            if (((subEvent.getEntity() instanceof Creature || subEvent.getEntity() instanceof WaterMob) && GriefPrevention.instance.config_claims_protectCreatures))
+            if (((subEvent.getEntity() instanceof Creature || subEvent.getEntity() instanceof WaterMob) && EterniaKamui.instance.config_claims_protectCreatures))
             {
                 //if entity is tameable and has an owner, apply special rules
                 if (subEvent.getEntity() instanceof Tameable)
@@ -1045,16 +1045,16 @@ public class EntityEventHandler implements Listener
                             if (attackerData.ignoreClaims) return;
 
                             //otherwise disallow in non-pvp worlds (and also pvp worlds if configured to do so)
-                            if (!GriefPrevention.instance.pvpRulesApply(subEvent.getEntity().getLocation().getWorld()) || (GriefPrevention.instance.config_pvp_protectPets && subEvent.getEntityType() != EntityType.WOLF))
+                            if (!EterniaKamui.instance.pvpRulesApply(subEvent.getEntity().getLocation().getWorld()) || (EterniaKamui.instance.config_pvp_protectPets && subEvent.getEntityType() != EntityType.WOLF))
                             {
-                                OfflinePlayer owner = GriefPrevention.instance.getServer().getOfflinePlayer(ownerID);
+                                OfflinePlayer owner = EterniaKamui.instance.getServer().getOfflinePlayer(ownerID);
                                 String ownerName = owner.getName();
                                 if (ownerName == null) ownerName = "someone";
-                                String message = GriefPrevention.instance.dataStore.getMessage(Messages.NoDamageClaimedEntity, ownerName);
+                                String message = EterniaKamui.instance.dataStore.getMessage(Messages.NoDamageClaimedEntity, ownerName);
                                 if (attacker.hasPermission("griefprevention.ignoreclaims"))
-                                    message += "  " + GriefPrevention.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
+                                    message += "  " + EterniaKamui.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
                                 if (sendErrorMessagesToPlayers)
-                                    GriefPrevention.sendMessage(attacker, TextMode.Err, message);
+                                    EterniaKamui.sendMessage(attacker, TextMode.Err, message);
                                 PreventPvPEvent pvpEvent = new PreventPvPEvent(new Claim(subEvent.getEntity().getLocation(), subEvent.getEntity().getLocation(), null, new ArrayList<String>(), new ArrayList<String>(), new ArrayList<String>(), new ArrayList<String>(), null));
                                 Bukkit.getPluginManager().callEvent(pvpEvent);
                                 if (!pvpEvent.isCancelled())
@@ -1068,7 +1068,7 @@ public class EntityEventHandler implements Listener
                             {
                                 event.setCancelled(true);
                                 if (sendErrorMessagesToPlayers)
-                                    GriefPrevention.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
+                                    EterniaKamui.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
                                 return;
                             }
                             // disallow players attacking tamed wolves (dogs) unless under attack by said wolf
@@ -1081,12 +1081,12 @@ public class EntityEventHandler implements Listener
                                         if (((Wolf) tameable).getTarget() == attacker) return;
                                     }
                                     event.setCancelled(true);
-                                    String ownerName = GriefPrevention.instance.getServer().getOfflinePlayer(ownerID).getName();
-                                    String message = GriefPrevention.instance.dataStore.getMessage(Messages.NoDamageClaimedEntity, ownerName);
+                                    String ownerName = EterniaKamui.instance.getServer().getOfflinePlayer(ownerID).getName();
+                                    String message = EterniaKamui.instance.dataStore.getMessage(Messages.NoDamageClaimedEntity, ownerName);
                                     if (attacker.hasPermission("griefprevention.ignoreclaims"))
-                                        message += "  " + GriefPrevention.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
+                                        message += "  " + EterniaKamui.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
                                     if (sendErrorMessagesToPlayers)
-                                        GriefPrevention.sendMessage(attacker, TextMode.Err, message);
+                                        EterniaKamui.sendMessage(attacker, TextMode.Err, message);
                                     return;
                                 }
                             }
@@ -1161,10 +1161,10 @@ public class EntityEventHandler implements Listener
 
                             if (sendErrorMessagesToPlayers)
                             {
-                                String message = GriefPrevention.instance.dataStore.getMessage(Messages.NoDamageClaimedEntity, claim.getOwnerName());
+                                String message = EterniaKamui.instance.dataStore.getMessage(Messages.NoDamageClaimedEntity, claim.getOwnerName());
                                 if (attacker.hasPermission("griefprevention.ignoreclaims"))
-                                    message += "  " + GriefPrevention.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
-                                GriefPrevention.sendMessage(attacker, TextMode.Err, message);
+                                    message += "  " + EterniaKamui.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
+                                EterniaKamui.sendMessage(attacker, TextMode.Err, message);
                             }
                             event.setCancelled(true);
                         }
@@ -1185,7 +1185,7 @@ public class EntityEventHandler implements Listener
     {
         if (shootEvent.getEntity() instanceof Player && shootEvent.getProjectile() instanceof Firework)
         {
-            shootEvent.getProjectile().setMetadata("GP_FIREWORK", new FixedMetadataValue(GriefPrevention.instance, shootEvent.getEntity()));
+            shootEvent.getProjectile().setMetadata("GP_FIREWORK", new FixedMetadataValue(EterniaKamui.instance, shootEvent.getEntity()));
         }
     }
 
@@ -1209,7 +1209,7 @@ public class EntityEventHandler implements Listener
         EntityDamageByEntityEvent subEvent = (EntityDamageByEntityEvent) event;
 
         //if not in a pvp rules world, do nothing
-        if (!GriefPrevention.instance.pvpRulesApply(defender.getWorld())) return;
+        if (!EterniaKamui.instance.pvpRulesApply(defender.getWorld())) return;
 
         //determine which player is attacking, if any
         Player attacker = null;
@@ -1264,13 +1264,13 @@ public class EntityEventHandler implements Listener
     public void onVehicleDamage(VehicleDamageEvent event)
     {
         //all of this is anti theft code
-        if (!GriefPrevention.instance.config_claims_preventTheft) return;
+        if (!EterniaKamui.instance.config_claims_preventTheft) return;
 
         //input validation
         if (event.getVehicle() == null) return;
 
         //don't track in worlds where claims are not enabled
-        if (!GriefPrevention.instance.claimsEnabledForWorld(event.getVehicle().getWorld())) return;
+        if (!EterniaKamui.instance.claimsEnabledForWorld(event.getVehicle().getWorld())) return;
 
         //determine which player is attacking, if any
         Player attacker = null;
@@ -1342,10 +1342,10 @@ public class EntityEventHandler implements Listener
                 if (noContainersReason != null)
                 {
                     event.setCancelled(true);
-                    String message = GriefPrevention.instance.dataStore.getMessage(Messages.NoDamageClaimedEntity, claim.getOwnerName());
+                    String message = EterniaKamui.instance.dataStore.getMessage(Messages.NoDamageClaimedEntity, claim.getOwnerName());
                     if (attacker.hasPermission("griefprevention.ignoreclaims"))
-                        message += "  " + GriefPrevention.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
-                    GriefPrevention.sendMessage(attacker, TextMode.Err, message);
+                        message += "  " + EterniaKamui.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
+                    EterniaKamui.sendMessage(attacker, TextMode.Err, message);
                     event.setCancelled(true);
                 }
 
@@ -1415,13 +1415,13 @@ public class EntityEventHandler implements Listener
 
                     //otherwise if in no-pvp zone, stop effect
                     //FEATURE: prevent players from engaging in PvP combat inside land claims (when it's disabled)
-                else if (GriefPrevention.instance.config_pvp_noCombatInPlayerLandClaims || GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims)
+                else if (EterniaKamui.instance.config_pvp_noCombatInPlayerLandClaims || EterniaKamui.instance.config_pvp_noCombatInAdminLandClaims)
                 {
                     Player effectedPlayer = (Player) effected;
                     PlayerData defenderData = this.dataStore.getPlayerData(effectedPlayer.getUniqueId());
                     PlayerData attackerData = this.dataStore.getPlayerData(thrower.getUniqueId());
                     Claim attackerClaim = this.dataStore.getClaimAt(thrower.getLocation(), false, attackerData.lastClaim);
-                    if (attackerClaim != null && GriefPrevention.instance.claimIsPvPSafeZone(attackerClaim))
+                    if (attackerClaim != null && EterniaKamui.instance.claimIsPvPSafeZone(attackerClaim))
                     {
                         attackerData.lastClaim = attackerClaim;
                         PreventPvPEvent pvpEvent = new PreventPvPEvent(attackerClaim);
@@ -1429,13 +1429,13 @@ public class EntityEventHandler implements Listener
                         if (!pvpEvent.isCancelled())
                         {
                             event.setIntensity(effected, 0);
-                            GriefPrevention.sendMessage(thrower, TextMode.Err, Messages.CantFightWhileImmune);
+                            EterniaKamui.sendMessage(thrower, TextMode.Err, Messages.CantFightWhileImmune);
                         }
                         continue;
                     }
 
                     Claim defenderClaim = this.dataStore.getClaimAt(effectedPlayer.getLocation(), false, defenderData.lastClaim);
-                    if (defenderClaim != null && GriefPrevention.instance.claimIsPvPSafeZone(defenderClaim))
+                    if (defenderClaim != null && EterniaKamui.instance.claimIsPvPSafeZone(defenderClaim))
                     {
                         defenderData.lastClaim = defenderClaim;
                         PreventPvPEvent pvpEvent = new PreventPvPEvent(defenderClaim);
@@ -1443,7 +1443,7 @@ public class EntityEventHandler implements Listener
                         if (!pvpEvent.isCancelled())
                         {
                             event.setIntensity(effected, 0);
-                            GriefPrevention.sendMessage(thrower, TextMode.Err, Messages.PlayerInPvPSafeZone);
+                            EterniaKamui.sendMessage(thrower, TextMode.Err, Messages.PlayerInPvPSafeZone);
                         }
                     }
                 }

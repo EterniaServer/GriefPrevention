@@ -29,10 +29,10 @@ import java.util.Collection;
 class DeliverClaimBlocksTask implements Runnable
 {
     private Player player;
-    private GriefPrevention instance;
+    private EterniaKamui instance;
     private int idleThresholdSquared;
 
-    public DeliverClaimBlocksTask(Player player, GriefPrevention instance)
+    public DeliverClaimBlocksTask(Player player, EterniaKamui instance)
     {
         this.player = player;
         this.instance = instance;
@@ -46,7 +46,7 @@ class DeliverClaimBlocksTask implements Runnable
         if (this.player == null)
         {
             @SuppressWarnings("unchecked")
-            Collection<Player> players = (Collection<Player>) GriefPrevention.instance.getServer().getOnlinePlayers();
+            Collection<Player> players = (Collection<Player>) EterniaKamui.instance.getServer().getOnlinePlayers();
 
             long i = 0;
             for (Player onlinePlayer : players)
@@ -93,7 +93,7 @@ class DeliverClaimBlocksTask implements Runnable
             {
                 if (instance.config_claims_accruedIdlePercent <= 0)
                 {
-                    GriefPrevention.AddLogEntry(player.getName() + " wasn't active enough to accrue claim blocks this round.", CustomLogEntryTypes.Debug, true);
+                    EterniaKamui.AddLogEntry(player.getName() + " wasn't active enough to accrue claim blocks this round.", CustomLogEntryTypes.Debug, true);
                     return; //idle accrual percentage is disabled
                 }
 
@@ -105,7 +105,7 @@ class DeliverClaimBlocksTask implements Runnable
             instance.getServer().getPluginManager().callEvent(event);
             if (event.isCancelled())
             {
-                GriefPrevention.AddLogEntry(player.getName() + " claim block delivery was canceled by another plugin.", CustomLogEntryTypes.Debug, true);
+                EterniaKamui.AddLogEntry(player.getName() + " claim block delivery was canceled by another plugin.", CustomLogEntryTypes.Debug, true);
                 return; //event was cancelled
             }
 
@@ -113,7 +113,7 @@ class DeliverClaimBlocksTask implements Runnable
             accrualRate = event.getBlocksToAccrue();
             if (accrualRate < 0) accrualRate = 0;
             playerData.accrueBlocks(accrualRate);
-            GriefPrevention.AddLogEntry("Delivering " + event.getBlocksToAccrue() + " blocks to " + player.getName(), CustomLogEntryTypes.Debug, true);
+            EterniaKamui.AddLogEntry("Delivering " + event.getBlocksToAccrue() + " blocks to " + player.getName(), CustomLogEntryTypes.Debug, true);
 
             //intentionally NOT saving data here to reduce overall secondary storage access frequency
             //many other operations will cause this player's data to save, including his eventual logout
@@ -121,7 +121,7 @@ class DeliverClaimBlocksTask implements Runnable
         }
         catch (Exception e)
         {
-            GriefPrevention.AddLogEntry("Problem delivering claim blocks to player " + player.getName() + ":");
+            EterniaKamui.AddLogEntry("Problem delivering claim blocks to player " + player.getName() + ":");
             e.printStackTrace();
         }
     }

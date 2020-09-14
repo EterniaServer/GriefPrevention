@@ -28,14 +28,14 @@ import org.bukkit.scheduler.BukkitRunnable;
 //if that happens, we detect the problem and send them back through the portal.
 class CheckForPortalTrapTask extends BukkitRunnable
 {
-    GriefPrevention instance;
+    EterniaKamui instance;
     //player who recently teleported via nether portal
     private Player player;
 
     //where to send the player back to if he hasn't left the portal frame
     private Location returnLocation;
 
-    public CheckForPortalTrapTask(Player player, GriefPrevention plugin, Location locationToReturn)
+    public CheckForPortalTrapTask(Player player, EterniaKamui plugin, Location locationToReturn)
     {
         this.player = player;
         this.instance = plugin;

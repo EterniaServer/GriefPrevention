@@ -28,7 +28,7 @@ class AutoExtendClaimTask implements Runnable
         int newY = this.getLowestBuiltY();
         if (newY < this.claim.getLesserBoundaryCorner().getBlockY())
         {
-            Bukkit.getScheduler().runTask(GriefPrevention.instance, new ExecuteExtendClaimTask(claim, newY));
+            Bukkit.getScheduler().runTask(EterniaKamui.instance, new ExecuteExtendClaimTask(claim, newY));
         }
     }
 
@@ -70,7 +70,7 @@ class AutoExtendClaimTask implements Runnable
         }
         catch (NoSuchMethodError e)
         {
-            GriefPrevention.instance.getLogger().severe("You are running an outdated build of Craftbukkit/Spigot/Paper. Please update.");
+            EterniaKamui.instance.getLogger().severe("You are running an outdated build of Craftbukkit/Spigot/Paper. Please update.");
             for (ChunkSnapshot chunk : this.chunks)
             {
                 Biome biome = chunk.getBiome(0, 0);
@@ -107,7 +107,7 @@ class AutoExtendClaimTask implements Runnable
 
     private boolean yTooSmall(int y)
     {
-        return y == 0 || y <= GriefPrevention.instance.config_claims_maxDepth;
+        return y == 0 || y <= EterniaKamui.instance.config_claims_maxDepth;
     }
 
     //runs in the main execution thread, where it can safely change claims and save those changes
@@ -125,7 +125,7 @@ class AutoExtendClaimTask implements Runnable
         @Override
         public void run()
         {
-            GriefPrevention.instance.dataStore.extendClaim(claim, newY);
+            EterniaKamui.instance.dataStore.extendClaim(claim, newY);
         }
     }
 

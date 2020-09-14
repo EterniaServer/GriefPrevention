@@ -44,13 +44,13 @@ class SecureClaimTask implements Runnable
 
             //eject bad guys
             @SuppressWarnings("unchecked")
-            Collection<Player> onlinePlayers = (Collection<Player>) GriefPrevention.instance.getServer().getOnlinePlayers();
+            Collection<Player> onlinePlayers = (Collection<Player>) EterniaKamui.instance.getServer().getOnlinePlayers();
             for (Player player : onlinePlayers)
             {
                 if (claim.contains(player.getLocation(), false, false) && claim.allowAccess(player) != null)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.SiegeDoorsLockedEjection);
-                    GriefPrevention.instance.ejectPlayer(player);
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.SiegeDoorsLockedEjection);
+                    EterniaKamui.instance.ejectPlayer(player);
                 }
             }
         }

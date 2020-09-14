@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>me.ryanhamshire</groupId>
-    <artifactId>GriefPrevention</artifactId>
+    <artifactId>EterniaKamui</artifactId>
     <version>16.14.0</version>
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -29,7 +29,10 @@
             <id>essx-repo</id>
             <url>https://ci.ender.zone/plugin/repository/everything/</url>
         </repository>
-
+        <repository>
+            <id>EterniaLib</id>
+            <url>https://raw.github.com/yurinogueira/EterniaLib/repository</url>
+        </repository>
     </repositories>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>
@@ -114,6 +117,12 @@
                     </exclusion>
                 </exclusions>
         </dependency>
+        <dependency>
+            <groupId>br.com.eterniaserver</groupId>
+            <artifactId>EterniaLib</artifactId>
+            <version>1.1.2</version>
+            <scope>provided</scope>
+        </dependency>
         <!--Tests-->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -139,6 +148,7 @@
             <version>3.4.6</version>
             <scope>test</scope>
         </dependency>
+
     </dependencies>
 
 </project>

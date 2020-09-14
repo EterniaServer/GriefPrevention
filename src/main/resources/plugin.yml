@@ -1,7 +1,8 @@
-name: GriefPrevention
-main: me.ryanhamshire.GriefPrevention.GriefPrevention
+name: EterniaKamui
+main: me.ryanhamshire.GriefPrevention.EterniaKamui
 softdepend: [Vault, Multiverse-Core, My_Worlds, MystCraft, Transporter, TheUnderground, WorldGuard, WorldEdit, RoyalCommands, MultiWorld, Denizen, Hyperconomy]
 dev-url: https://dev.bukkit.org/projects/grief-prevention
+depend: [EterniaLib]
 loadbefore: [TheUnderground]
 version: '${project.version}-${git.commit.id.abbrev}'
 api-version: '1.16'

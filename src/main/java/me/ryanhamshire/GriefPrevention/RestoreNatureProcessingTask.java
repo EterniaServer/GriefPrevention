@@ -162,7 +162,7 @@ class RestoreNatureProcessingTask implements Runnable
 
         //schedule main thread task to apply the result to the world
         RestoreNatureExecutionTask task = new RestoreNatureExecutionTask(this.snapshots, this.miny, this.lesserBoundaryCorner, this.greaterBoundaryCorner, this.player);
-        GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, task);
+        EterniaKamui.instance.getServer().getScheduler().scheduleSyncDelayedTask(EterniaKamui.instance, task);
     }
 
 

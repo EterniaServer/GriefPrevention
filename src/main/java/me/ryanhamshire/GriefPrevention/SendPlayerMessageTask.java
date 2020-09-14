@@ -41,21 +41,21 @@ class SendPlayerMessageTask implements Runnable
     {
         if (player == null)
         {
-            GriefPrevention.AddLogEntry(color + message);
+            EterniaKamui.AddLogEntry(color + message);
             return;
         }
 
         //if the player is dead, save it for after his respawn
         if (this.player.isDead())
         {
-            PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(this.player.getUniqueId());
+            PlayerData playerData = EterniaKamui.instance.dataStore.getPlayerData(this.player.getUniqueId());
             playerData.messageOnRespawn = this.color + this.message;
         }
 
         //otherwise send it immediately
         else
         {
-            GriefPrevention.sendMessage(this.player, this.color, this.message);
+            EterniaKamui.sendMessage(this.player, this.color, this.message);
         }
     }
 }

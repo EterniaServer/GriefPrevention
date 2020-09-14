@@ -108,7 +108,7 @@ import java.util.regex.Pattern;
 class PlayerEventHandler implements Listener
 {
     private DataStore dataStore;
-    private GriefPrevention instance;
+    private EterniaKamui instance;
 
     //list of temporarily banned ip's
     private ArrayList<IpBanInfo> tempBannedIps = new ArrayList<IpBanInfo>();
@@ -129,7 +129,7 @@ class PlayerEventHandler implements Listener
     SpamDetector spamDetector = new SpamDetector();
 
     //typical constructor, yawn
-    PlayerEventHandler(DataStore dataStore, GriefPrevention plugin)
+    PlayerEventHandler(DataStore dataStore, EterniaKamui plugin)
     {
         this.dataStore = dataStore;
         this.instance = plugin;
@@ -615,7 +615,7 @@ class PlayerEventHandler implements Listener
 
         longestNameLength = Math.max(longestNameLength, name.length());
         //TODO: cleanup static
-        GriefPrevention.AddLogEntry(entryBuilder.toString(), CustomLogEntryTypes.SocialActivity, true);
+        EterniaKamui.AddLogEntry(entryBuilder.toString(), CustomLogEntryTypes.SocialActivity, true);
     }
 
     private ConcurrentHashMap<UUID, Date> lastLoginThisServerSessionMap = new ConcurrentHashMap<UUID, Date>();
@@ -1543,13 +1543,13 @@ class PlayerEventHandler implements Listener
 
     private boolean doesAllowLavaProximityInWorld(World world)
     {
-        if (GriefPrevention.instance.pvpRulesApply(world))
+        if (EterniaKamui.instance.pvpRulesApply(world))
         {
-            return GriefPrevention.instance.config_pvp_allowLavaNearPlayers;
+            return EterniaKamui.instance.config_pvp_allowLavaNearPlayers;
         }
         else
         {
-            return GriefPrevention.instance.config_pvp_allowLavaNearPlayers_NonPvp;
+            return EterniaKamui.instance.config_pvp_allowLavaNearPlayers_NonPvp;
         }
     }
 
@@ -1845,7 +1845,7 @@ class PlayerEventHandler implements Listener
             //if it's bonemeal, armor stand, spawn egg, etc - check for build permission //RoboMWM: also check flint and steel to stop TNT ignition
             if (clickedBlock != null && (materialInHand == Material.BONE_MEAL
                     || materialInHand == Material.ARMOR_STAND
-                    || (spawn_eggs.contains(materialInHand) && GriefPrevention.instance.config_claims_preventGlobalMonsterEggs)
+                    || (spawn_eggs.contains(materialInHand) && EterniaKamui.instance.config_claims_preventGlobalMonsterEggs)
                     || materialInHand == Material.END_CRYSTAL
                     || materialInHand == Material.FLINT_AND_STEEL
                     || dyes.contains(materialInHand)))
@@ -2618,7 +2618,7 @@ class PlayerEventHandler implements Listener
             {
                 event.setCancelled(true);
                 player.closeInventory();
-                GriefPrevention.sendMessage(player, TextMode.Err, noContainerReason);
+                EterniaKamui.sendMessage(player, TextMode.Err, noContainerReason);
             }
         }
     }

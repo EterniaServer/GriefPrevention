@@ -1,23 +1,6 @@
-/*
-	GriefPrevention Server Plugin for Minecraft
-	Copyright (C) 2012 Ryan Hamshire
-
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package me.ryanhamshire.GriefPrevention;
 
+import br.com.eterniaserver.eternialib.EQueries;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
@@ -81,7 +64,7 @@ public class DatabaseDataStore extends DataStore
         }
         catch (Exception e)
         {
-            GriefPrevention.AddLogEntry("ERROR: Unable to load Java's mySQL database driver.  Check to make sure you've installed it properly.");
+            EterniaKamui.AddLogEntry("ERROR: Unable to load Java's mySQL database driver.  Check to make sure you've installed it properly.");
             throw e;
         }
 
@@ -91,9 +74,15 @@ public class DatabaseDataStore extends DataStore
         }
         catch (Exception e2)
         {
-            GriefPrevention.AddLogEntry("ERROR: Unable to connect to database.  Check your config file settings.");
+            EterniaKamui.AddLogEntry("ERROR: Unable to connect to database.  Check your config file settings.");
             throw e2;
         }
+
+        EQueries.executeQuery("CREATE TABLE IF NOT EXISTS ek_worlds (id INT(15), " +
+                        "name VARCHAR(36), " +
+                        "enviroment VARCHAR(36), " +
+                        "type VARCHAR(36), " +
+                        "invclear INT(1));", false);
 
         try
         {
@@ -123,8 +112,8 @@ public class DatabaseDataStore extends DataStore
         }
         catch (Exception e3)
         {
-            GriefPrevention.AddLogEntry("ERROR: Unable to create the necessary database table.  Details:");
-            GriefPrevention.AddLogEntry(e3.getMessage());
+            EterniaKamui.AddLogEntry("ERROR: Unable to create the necessary database table.  Details:");
+            EterniaKamui.AddLogEntry(e3.getMessage());
             e3.printStackTrace();
             throw e3;
         }
@@ -208,7 +197,7 @@ public class DatabaseDataStore extends DataStore
                 }
                 catch (Exception e)
                 {
-                    GriefPrevention.AddLogEntry("Failed to resolve a batch of names to UUIDs.  Details:" + e.getMessage());
+                    EterniaKamui.AddLogEntry("Failed to resolve a batch of names to UUIDs.  Details:" + e.getMessage());
                     e.printStackTrace();
                 }
 
@@ -249,15 +238,15 @@ public class DatabaseDataStore extends DataStore
                     }
                     catch (SQLException e)
                     {
-                        GriefPrevention.AddLogEntry("Unable to convert player data for " + name + ".  Skipping.");
-                        GriefPrevention.AddLogEntry(e.getMessage());
+                        EterniaKamui.AddLogEntry("Unable to convert player data for " + name + ".  Skipping.");
+                        EterniaKamui.AddLogEntry(e.getMessage());
                     }
                 }
             }
             catch (SQLException e)
             {
-                GriefPrevention.AddLogEntry("Unable to convert player data.  Details:");
-                GriefPrevention.AddLogEntry(e.getMessage());
+                EterniaKamui.AddLogEntry("Unable to convert player data.  Details:");
+                EterniaKamui.AddLogEntry(e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -301,7 +290,7 @@ public class DatabaseDataStore extends DataStore
                 {
                     if (e.getMessage() != null && e.getMessage().contains("World not found"))
                     {
-                        GriefPrevention.AddLogEntry("Failed to load a claim (ID:" + claimID.toString() + ") because its world isn't loaded (yet?).  Please delete the claim or contact the GriefPrevention developer with information about which plugin(s) you're using to load or create worlds.  " + lesserCornerString);
+                        EterniaKamui.AddLogEntry("Failed to load a claim (ID:" + claimID.toString() + ") because its world isn't loaded (yet?).  Please delete the claim or contact the GriefPrevention developer with information about which plugin(s) you're using to load or create worlds.  " + lesserCornerString);
                         continue;
                     }
                     else
@@ -324,8 +313,8 @@ public class DatabaseDataStore extends DataStore
                     }
                     catch (Exception ex)
                     {
-                        GriefPrevention.AddLogEntry("This owner name did not convert to a UUID: " + ownerName + ".");
-                        GriefPrevention.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
+                        EterniaKamui.AddLogEntry("This owner name did not convert to a UUID: " + ownerName + ".");
+                        EterniaKamui.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
                     }
                 }
                 else
@@ -336,8 +325,8 @@ public class DatabaseDataStore extends DataStore
                     }
                     catch (Exception ex)
                     {
-                        GriefPrevention.AddLogEntry("This owner entry is not a UUID: " + ownerName + ".");
-                        GriefPrevention.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
+                        EterniaKamui.AddLogEntry("This owner entry is not a UUID: " + ownerName + ".");
+                        EterniaKamui.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
                     }
                 }
 
@@ -375,7 +364,7 @@ public class DatabaseDataStore extends DataStore
             }
             catch (SQLException e)
             {
-                GriefPrevention.AddLogEntry("Unable to load a claim.  Details: " + e.getMessage() + " ... " + results.toString());
+                EterniaKamui.AddLogEntry("Unable to load a claim.  Details: " + e.getMessage() + " ... " + results.toString());
                 e.printStackTrace();
             }
         }
@@ -389,7 +378,7 @@ public class DatabaseDataStore extends DataStore
             if (topLevelClaim == null)
             {
                 claimsToRemove.add(childClaim);
-                GriefPrevention.AddLogEntry("Removing orphaned claim subdivision: " + childClaim.getLesserBoundaryCorner().toString());
+                EterniaKamui.AddLogEntry("Removing orphaned claim subdivision: " + childClaim.getLesserBoundaryCorner().toString());
                 continue;
             }
 
@@ -429,8 +418,8 @@ public class DatabaseDataStore extends DataStore
         }
         catch (SQLException e)
         {
-            GriefPrevention.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
+            EterniaKamui.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
+            EterniaKamui.AddLogEntry(e.getMessage());
         }
     }
 
@@ -473,8 +462,8 @@ public class DatabaseDataStore extends DataStore
         }
         catch (SQLException e)
         {
-            GriefPrevention.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
+            EterniaKamui.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
+            EterniaKamui.AddLogEntry(e.getMessage());
         }
     }
 
@@ -489,8 +478,8 @@ public class DatabaseDataStore extends DataStore
         }
         catch (SQLException e)
         {
-            GriefPrevention.AddLogEntry("Unable to delete data for claim " + claim.id + ".  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
+            EterniaKamui.AddLogEntry("Unable to delete data for claim " + claim.id + ".  Details:");
+            EterniaKamui.AddLogEntry(e.getMessage());
             e.printStackTrace();
         }
     }
@@ -517,7 +506,7 @@ public class DatabaseDataStore extends DataStore
         {
             StringWriter errors = new StringWriter();
             e.printStackTrace(new PrintWriter(errors));
-            GriefPrevention.AddLogEntry(playerID + " " + errors.toString(), CustomLogEntryTypes.Exception);
+            EterniaKamui.AddLogEntry(playerID + " " + errors.toString(), CustomLogEntryTypes.Exception);
         }
 
         return playerData;
@@ -555,7 +544,7 @@ public class DatabaseDataStore extends DataStore
         {
             StringWriter errors = new StringWriter();
             e.printStackTrace(new PrintWriter(errors));
-            GriefPrevention.AddLogEntry(playerID + " " + errors.toString(), CustomLogEntryTypes.Exception);
+            EterniaKamui.AddLogEntry(playerID + " " + errors.toString(), CustomLogEntryTypes.Exception);
         }
     }
 
@@ -579,8 +568,8 @@ public class DatabaseDataStore extends DataStore
         }
         catch (SQLException e)
         {
-            GriefPrevention.AddLogEntry("Unable to set next claim ID to " + nextID + ".  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
+            EterniaKamui.AddLogEntry("Unable to set next claim ID to " + nextID + ".  Details:");
+            EterniaKamui.AddLogEntry(e.getMessage());
         }
     }
 
@@ -605,8 +594,8 @@ public class DatabaseDataStore extends DataStore
         }
         catch (SQLException e)
         {
-            GriefPrevention.AddLogEntry("Unable to save data for group " + groupName + ".  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
+            EterniaKamui.AddLogEntry("Unable to save data for group " + groupName + ".  Details:");
+            EterniaKamui.AddLogEntry(e.getMessage());
         }
     }
 
@@ -671,8 +660,8 @@ public class DatabaseDataStore extends DataStore
         }
         catch (SQLException e)
         {
-            GriefPrevention.AddLogEntry("Unable to retrieve schema version from database.  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
+            EterniaKamui.AddLogEntry("Unable to retrieve schema version from database.  Details:");
+            EterniaKamui.AddLogEntry(e.getMessage());
             e.printStackTrace();
             return 0;
         }
@@ -691,8 +680,8 @@ public class DatabaseDataStore extends DataStore
         }
         catch (SQLException e)
         {
-            GriefPrevention.AddLogEntry("Unable to set next schema version to " + versionToSet + ".  Details:");
-            GriefPrevention.AddLogEntry(e.getMessage());
+            EterniaKamui.AddLogEntry("Unable to set next schema version to " + versionToSet + ".  Details:");
+            EterniaKamui.AddLogEntry(e.getMessage());
         }
     }
 

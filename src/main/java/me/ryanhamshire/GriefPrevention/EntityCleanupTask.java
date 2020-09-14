@@ -46,9 +46,9 @@ class EntityCleanupTask implements Runnable
     public void run()
     {
         ArrayList<World> worlds = new ArrayList<World>();
-        for (World world : GriefPrevention.instance.getServer().getWorlds())
+        for (World world : EterniaKamui.instance.getServer().getWorlds())
         {
-            if (GriefPrevention.instance.config_claims_worldModes.get(world) == ClaimsMode.Creative)
+            if (EterniaKamui.instance.config_claims_worldModes.get(world) == ClaimsMode.Creative)
             {
                 worlds.add(world);
             }
@@ -101,7 +101,7 @@ class EntityCleanupTask implements Runnable
                 //all non-player entities must be in claims
                 else if (!(entity instanceof Player))
                 {
-                    Claim claim = GriefPrevention.instance.dataStore.getClaimAt(entity.getLocation(), false, cachedClaim);
+                    Claim claim = EterniaKamui.instance.dataStore.getClaimAt(entity.getLocation(), false, cachedClaim);
                     if (claim != null)
                     {
                         cachedClaim = claim;
@@ -114,14 +114,14 @@ class EntityCleanupTask implements Runnable
 
                 if (remove)
                 {
-                    GriefPrevention.AddLogEntry("Removing entity " + entity.getType().name() + " @ " + entity.getLocation(), CustomLogEntryTypes.Debug, true);
+                    EterniaKamui.AddLogEntry("Removing entity " + entity.getType().name() + " @ " + entity.getLocation(), CustomLogEntryTypes.Debug, true);
                     entity.remove();
                 }
             }
         }
 
         //starting and stopping point.  each execution of the task scans 5% of the server's claims
-        List<Claim> claims = GriefPrevention.instance.dataStore.claims;
+        List<Claim> claims = EterniaKamui.instance.dataStore.claims;
         int j = (int) (claims.size() * this.percentageStart);
         int k = (int) (claims.size() * (this.percentageStart + .05));
         for (; j < claims.size() && j < k; j++)
@@ -129,7 +129,7 @@ class EntityCleanupTask implements Runnable
             Claim claim = claims.get(j);
 
             //if it's a creative mode claim
-            if (GriefPrevention.instance.creativeRulesApply(claim.getLesserBoundaryCorner()))
+            if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()))
             {
                 //check its entity count and remove any extras
                 claim.allowMoreEntities(true);
@@ -144,6 +144,6 @@ class EntityCleanupTask implements Runnable
         }
 
         EntityCleanupTask task = new EntityCleanupTask(nextRunPercentageStart);
-        GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, task, 20L * 60 * 1);
+        EterniaKamui.instance.getServer().getScheduler().scheduleSyncDelayedTask(EterniaKamui.instance, task, 20L * 60 * 1);
     }
 }

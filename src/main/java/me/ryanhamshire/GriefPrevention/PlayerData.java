@@ -140,7 +140,7 @@ public class PlayerData
 
         long elapsed = now - this.lastPvpTimestamp;
 
-        if (elapsed > GriefPrevention.instance.config_pvp_combatTimeoutSeconds * 1000) //X seconds
+        if (elapsed > EterniaKamui.instance.config_pvp_combatTimeoutSeconds * 1000) //X seconds
         {
             this.lastPvpTimestamp = 0;
             return false;
@@ -152,7 +152,7 @@ public class PlayerData
     //the number of claim blocks a player has available for claiming land
     public int getRemainingClaimBlocks()
     {
-        int remainingBlocks = this.getAccruedClaimBlocks() + this.getBonusClaimBlocks() + GriefPrevention.instance.dataStore.getGroupBonusBlocks(this.playerID);
+        int remainingBlocks = this.getAccruedClaimBlocks() + this.getBonusClaimBlocks() + EterniaKamui.instance.dataStore.getGroupBonusBlocks(this.playerID);
         for (int i = 0; i < this.getClaims().size(); i++)
         {
             Claim claim = this.getClaims().get(i);
@@ -209,7 +209,7 @@ public class PlayerData
     private void loadDataFromSecondaryStorage()
     {
         //reach out to secondary storage to get any data there
-        PlayerData storageData = GriefPrevention.instance.dataStore.getPlayerDataFromStorage(this.playerID);
+        PlayerData storageData = EterniaKamui.instance.dataStore.getPlayerDataFromStorage(this.playerID);
 
         if (this.accruedClaimBlocks == null)
         {
@@ -218,15 +218,15 @@ public class PlayerData
                 this.accruedClaimBlocks = storageData.accruedClaimBlocks;
 
                 //ensure at least minimum accrued are accrued (in case of settings changes to increase initial amount)
-                if (GriefPrevention.instance.config_advanced_fixNegativeClaimblockAmounts && (this.accruedClaimBlocks < GriefPrevention.instance.config_claims_initialBlocks))
+                if (EterniaKamui.instance.config_advanced_fixNegativeClaimblockAmounts && (this.accruedClaimBlocks < EterniaKamui.instance.config_claims_initialBlocks))
                 {
-                    this.accruedClaimBlocks = GriefPrevention.instance.config_claims_initialBlocks;
+                    this.accruedClaimBlocks = EterniaKamui.instance.config_claims_initialBlocks;
                 }
 
             }
             else
             {
-                this.accruedClaimBlocks = GriefPrevention.instance.config_claims_initialBlocks;
+                this.accruedClaimBlocks = EterniaKamui.instance.config_claims_initialBlocks;
             }
         }
 
@@ -250,7 +250,7 @@ public class PlayerData
             this.claims = new Vector<Claim>();
 
             //find all the claims belonging to this player and note them for future reference
-            DataStore dataStore = GriefPrevention.instance.dataStore;
+            DataStore dataStore = EterniaKamui.instance.dataStore;
             int totalClaimsArea = 0;
             for (int i = 0; i < dataStore.claims.size(); i++)
             {
@@ -271,19 +271,19 @@ public class PlayerData
             this.loadDataFromSecondaryStorage();
 
             //if total claimed area is more than total blocks available
-            int totalBlocks = this.accruedClaimBlocks + this.getBonusClaimBlocks() + GriefPrevention.instance.dataStore.getGroupBonusBlocks(this.playerID);
-            if (GriefPrevention.instance.config_advanced_fixNegativeClaimblockAmounts && totalBlocks < totalClaimsArea)
+            int totalBlocks = this.accruedClaimBlocks + this.getBonusClaimBlocks() + EterniaKamui.instance.dataStore.getGroupBonusBlocks(this.playerID);
+            if (EterniaKamui.instance.config_advanced_fixNegativeClaimblockAmounts && totalBlocks < totalClaimsArea)
             {
-                OfflinePlayer player = GriefPrevention.instance.getServer().getOfflinePlayer(this.playerID);
-                GriefPrevention.AddLogEntry(player.getName() + " has more claimed land than blocks available.  Adding blocks to fix.", CustomLogEntryTypes.Debug, true);
-                GriefPrevention.AddLogEntry(player.getName() + " Accrued blocks: " + this.getAccruedClaimBlocks() + " Bonus blocks: " + this.getBonusClaimBlocks(), CustomLogEntryTypes.Debug, true);
-                GriefPrevention.AddLogEntry("Total blocks: " + totalBlocks + " Total claimed area: " + totalClaimsArea, CustomLogEntryTypes.Debug, true);
+                OfflinePlayer player = EterniaKamui.instance.getServer().getOfflinePlayer(this.playerID);
+                EterniaKamui.AddLogEntry(player.getName() + " has more claimed land than blocks available.  Adding blocks to fix.", CustomLogEntryTypes.Debug, true);
+                EterniaKamui.AddLogEntry(player.getName() + " Accrued blocks: " + this.getAccruedClaimBlocks() + " Bonus blocks: " + this.getBonusClaimBlocks(), CustomLogEntryTypes.Debug, true);
+                EterniaKamui.AddLogEntry("Total blocks: " + totalBlocks + " Total claimed area: " + totalClaimsArea, CustomLogEntryTypes.Debug, true);
                 for (Claim claim : this.claims)
                 {
                     if (!claim.inDataStore) continue;
-                    GriefPrevention.AddLogEntry(
-                            GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()) + " // "
-                                    + GriefPrevention.getfriendlyLocationString(claim.getGreaterBoundaryCorner()) + " = "
+                    EterniaKamui.AddLogEntry(
+                            EterniaKamui.getfriendlyLocationString(claim.getLesserBoundaryCorner()) + " // "
+                                    + EterniaKamui.getfriendlyLocationString(claim.getGreaterBoundaryCorner()) + " = "
                                     + claim.getArea()
                             , CustomLogEntryTypes.Debug, true);
                 }
@@ -292,24 +292,24 @@ public class PlayerData
                 this.accruedClaimBlocks = totalClaimsArea; //Set accrued blocks to equal total claims
                 int accruedLimit = this.getAccruedClaimBlocksLimit();
                 this.accruedClaimBlocks = Math.min(accruedLimit, this.accruedClaimBlocks); //set accrued blocks to maximum limit, if it's smaller
-                GriefPrevention.AddLogEntry("New accrued blocks: " + this.accruedClaimBlocks, CustomLogEntryTypes.Debug, true);
+                EterniaKamui.AddLogEntry("New accrued blocks: " + this.accruedClaimBlocks, CustomLogEntryTypes.Debug, true);
 
                 //Recalculate total blocks (accrued + bonus + permission group bonus)
-                totalBlocks = this.accruedClaimBlocks + this.getBonusClaimBlocks() + GriefPrevention.instance.dataStore.getGroupBonusBlocks(this.playerID);
-                GriefPrevention.AddLogEntry("New total blocks: " + totalBlocks, CustomLogEntryTypes.Debug, true);
+                totalBlocks = this.accruedClaimBlocks + this.getBonusClaimBlocks() + EterniaKamui.instance.dataStore.getGroupBonusBlocks(this.playerID);
+                EterniaKamui.AddLogEntry("New total blocks: " + totalBlocks, CustomLogEntryTypes.Debug, true);
 
                 //if that didn't fix it, then make up the difference with bonus blocks
                 if (totalBlocks < totalClaimsArea)
                 {
                     int bonusBlocksToAdd = totalClaimsArea - totalBlocks;
                     this.bonusClaimBlocks += bonusBlocksToAdd;
-                    GriefPrevention.AddLogEntry("Accrued blocks weren't enough. Adding " + bonusBlocksToAdd + " bonus blocks.", CustomLogEntryTypes.Debug, true);
+                    EterniaKamui.AddLogEntry("Accrued blocks weren't enough. Adding " + bonusBlocksToAdd + " bonus blocks.", CustomLogEntryTypes.Debug, true);
                 }
-                GriefPrevention.AddLogEntry(player.getName() + " Accrued blocks: " + this.getAccruedClaimBlocks() + " Bonus blocks: " + this.getBonusClaimBlocks() + " Group Bonus Blocks: " + GriefPrevention.instance.dataStore.getGroupBonusBlocks(this.playerID), CustomLogEntryTypes.Debug, true);
+                EterniaKamui.AddLogEntry(player.getName() + " Accrued blocks: " + this.getAccruedClaimBlocks() + " Bonus blocks: " + this.getBonusClaimBlocks() + " Group Bonus Blocks: " + EterniaKamui.instance.dataStore.getGroupBonusBlocks(this.playerID), CustomLogEntryTypes.Debug, true);
                 //Recalculate total blocks (accrued + bonus + permission group bonus)
-                totalBlocks = this.accruedClaimBlocks + this.getBonusClaimBlocks() + GriefPrevention.instance.dataStore.getGroupBonusBlocks(this.playerID);
-                GriefPrevention.AddLogEntry("Total blocks: " + totalBlocks + " Total claimed area: " + totalClaimsArea, CustomLogEntryTypes.Debug, true);
-                GriefPrevention.AddLogEntry("Remaining claim blocks to use: " + this.getRemainingClaimBlocks() + " (should be 0)", CustomLogEntryTypes.Debug, true);
+                totalBlocks = this.accruedClaimBlocks + this.getBonusClaimBlocks() + EterniaKamui.instance.dataStore.getGroupBonusBlocks(this.playerID);
+                EterniaKamui.AddLogEntry("Total blocks: " + totalBlocks + " Total claimed area: " + totalClaimsArea, CustomLogEntryTypes.Debug, true);
+                EterniaKamui.AddLogEntry("Remaining claim blocks to use: " + this.getRemainingClaimBlocks() + " (should be 0)", CustomLogEntryTypes.Debug, true);
             }
         }
 
@@ -328,7 +328,7 @@ public class PlayerData
     public int getAccruedClaimBlocksLimit()
     {
         if (this.AccruedClaimBlocksLimit < 0)
-            return GriefPrevention.instance.config_claims_maxAccruedBlocks_default;
+            return EterniaKamui.instance.config_claims_maxAccruedBlocks_default;
         return this.AccruedClaimBlocksLimit;
     }
 

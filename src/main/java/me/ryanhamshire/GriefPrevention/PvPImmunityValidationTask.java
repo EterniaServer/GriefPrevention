@@ -36,20 +36,20 @@ class PvPImmunityValidationTask implements Runnable
     {
         if (!player.isOnline()) return;
 
-        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = EterniaKamui.instance.dataStore.getPlayerData(player.getUniqueId());
         if (!playerData.pvpImmune) return;
 
         //check the player's inventory for anything
-        if (!GriefPrevention.isInventoryEmpty(player))
+        if (!EterniaKamui.isInventoryEmpty(player))
         {
             //if found, cancel invulnerability and notify
             playerData.pvpImmune = false;
-            GriefPrevention.sendMessage(player, TextMode.Warn, Messages.PvPImmunityEnd);
+            EterniaKamui.sendMessage(player, TextMode.Warn, Messages.PvPImmunityEnd);
         }
         else
         {
             //otherwise check again in one minute
-            GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, this, 1200L);
+            EterniaKamui.instance.getServer().getScheduler().scheduleSyncDelayedTask(EterniaKamui.instance, this, 1200L);
         }
     }
 }

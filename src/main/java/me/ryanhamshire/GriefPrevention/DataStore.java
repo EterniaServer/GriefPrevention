@@ -135,16 +135,16 @@ public abstract class DataStore
     //initialization!
     void initialize() throws Exception
     {
-        GriefPrevention.AddLogEntry(this.claims.size() + " total claims loaded.");
+        EterniaKamui.AddLogEntry(this.claims.size() + " total claims loaded.");
 
         //RoboMWM: ensure the nextClaimID is greater than any other claim ID. If not, data corruption occurred (out of storage space, usually).
         for (Claim claim : this.claims)
         {
             if (claim.id >= nextClaimID)
             {
-                GriefPrevention.instance.getLogger().severe("nextClaimID was lesser or equal to an already-existing claim ID!\n" +
+                EterniaKamui.instance.getLogger().severe("nextClaimID was lesser or equal to an already-existing claim ID!\n" +
                         "This usually happens if you ran out of storage space.");
-                GriefPrevention.AddLogEntry("Changing nextClaimID from " + nextClaimID + " to " + claim.id, CustomLogEntryTypes.Debug, false);
+                EterniaKamui.AddLogEntry("Changing nextClaimID from " + nextClaimID + " to " + claim.id, CustomLogEntryTypes.Debug, false);
                 nextClaimID = claim.id + 1;
             }
         }
@@ -158,12 +158,12 @@ public abstract class DataStore
 
         //load up all the messages from messages.yml
         this.loadMessages();
-        GriefPrevention.AddLogEntry("Customizable messages loaded.");
+        EterniaKamui.AddLogEntry("Customizable messages loaded.");
 
         //if converting up from an earlier schema version, write all claims back to storage using the latest format
         if (this.getSchemaVersion() < latestSchemaVersion)
         {
-            GriefPrevention.AddLogEntry("Please wait.  Updating data format.");
+            EterniaKamui.AddLogEntry("Please wait.  Updating data format.");
 
             for (Claim claim : this.claims)
             {
@@ -182,7 +182,7 @@ public abstract class DataStore
                 UUIDFetcher.correctedNames.clear();
             }
 
-            GriefPrevention.AddLogEntry("Update finished.");
+            EterniaKamui.AddLogEntry("Update finished.");
         }
 
         //load list of soft mutes
@@ -195,7 +195,7 @@ public abstract class DataStore
         try
         {
             this.worldGuard = new WorldGuardWrapper();
-            GriefPrevention.AddLogEntry("Successfully hooked into WorldGuard.");
+            EterniaKamui.AddLogEntry("Successfully hooked into WorldGuard.");
         }
         //if failed, world guard compat features will just be disabled.
         catch (ClassNotFoundException exception) { }
@@ -226,7 +226,7 @@ public abstract class DataStore
                     catch (Exception e)
                     {
                         playerID = null;
-                        GriefPrevention.AddLogEntry("Failed to parse soft mute entry as a UUID: " + nextID);
+                        EterniaKamui.AddLogEntry("Failed to parse soft mute entry as a UUID: " + nextID);
                     }
 
                     //push it into the map
@@ -241,7 +241,7 @@ public abstract class DataStore
             }
             catch (Exception e)
             {
-                GriefPrevention.AddLogEntry("Failed to read from the soft mute data file: " + e.toString());
+                EterniaKamui.AddLogEntry("Failed to read from the soft mute data file: " + e.toString());
                 e.printStackTrace();
             }
 
@@ -272,7 +272,7 @@ public abstract class DataStore
         }
         catch (Exception e)
         {
-            GriefPrevention.AddLogEntry("Failed to read from the banned words data file: " + e.toString());
+            EterniaKamui.AddLogEntry("Failed to read from the banned words data file: " + e.toString());
             e.printStackTrace();
             return new ArrayList<String>();
         }
@@ -325,7 +325,7 @@ public abstract class DataStore
         //if any problem, log it
         catch (Exception e)
         {
-            GriefPrevention.AddLogEntry("Unexpected exception saving soft mute data: " + e.getMessage());
+            EterniaKamui.AddLogEntry("Unexpected exception saving soft mute data: " + e.getMessage());
             e.printStackTrace();
         }
 
@@ -354,7 +354,7 @@ public abstract class DataStore
         while (iterator.hasNext())
         {
             String groupName = iterator.next();
-            Player player = GriefPrevention.instance.getServer().getPlayer(playerID);
+            Player player = EterniaKamui.instance.getServer().getPlayer(playerID);
             if (player != null && player.hasPermission(groupName))
             {
                 bonusBlocks += this.permissionToBonusBlocksMap.get(groupName);
@@ -844,8 +844,8 @@ public abstract class DataStore
 
         int smallx, bigx, smally, bigy, smallz, bigz;
 
-        if (y1 < GriefPrevention.instance.config_claims_maxDepth) y1 = GriefPrevention.instance.config_claims_maxDepth;
-        if (y2 < GriefPrevention.instance.config_claims_maxDepth) y2 = GriefPrevention.instance.config_claims_maxDepth;
+        if (y1 < EterniaKamui.instance.config_claims_maxDepth) y1 = EterniaKamui.instance.config_claims_maxDepth;
+        if (y2 < EterniaKamui.instance.config_claims_maxDepth) y2 = EterniaKamui.instance.config_claims_maxDepth;
 
         //determine small versus big inputs
         if (x1 < x2)
@@ -894,7 +894,7 @@ public abstract class DataStore
         }
 
         //creative mode claims always go to bedrock
-        if (GriefPrevention.instance.config_claims_worldModes.get(world) == ClaimsMode.Creative)
+        if (EterniaKamui.instance.config_claims_worldModes.get(world) == ClaimsMode.Creative)
         {
             smally = 0;
         }
@@ -938,7 +938,7 @@ public abstract class DataStore
         }
 
         //if worldguard is installed, also prevent claims from overlapping any worldguard regions
-        if (GriefPrevention.instance.config_claims_respectWorldGuard && this.worldGuard != null && creatingPlayer != null)
+        if (EterniaKamui.instance.config_claims_respectWorldGuard && this.worldGuard != null && creatingPlayer != null)
         {
             if (!this.worldGuard.canBuild(newClaim.lesserBoundaryCorner, newClaim.greaterBoundaryCorner, creatingPlayer))
             {
@@ -1023,7 +1023,7 @@ public abstract class DataStore
             //if any problem, log it
             catch (Exception e)
             {
-                GriefPrevention.AddLogEntry("GriefPrevention: Unexpected exception saving data for player \"" + playerID.toString() + "\": " + e.getMessage());
+                EterniaKamui.AddLogEntry("GriefPrevention: Unexpected exception saving data for player \"" + playerID.toString() + "\": " + e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -1035,8 +1035,8 @@ public abstract class DataStore
     //respects the max depth config variable
     synchronized public void extendClaim(Claim claim, int newDepth)
     {
-        if (newDepth < GriefPrevention.instance.config_claims_maxDepth)
-            newDepth = GriefPrevention.instance.config_claims_maxDepth;
+        if (newDepth < EterniaKamui.instance.config_claims_maxDepth)
+            newDepth = EterniaKamui.instance.config_claims_maxDepth;
 
         if (claim.parent != null) claim = claim.parent;
 
@@ -1075,7 +1075,7 @@ public abstract class DataStore
         //why isn't this a "repeating" task?
         //because depending on the status of the siege at the time the task runs, there may or may not be a reason to run the task again
         SiegeCheckupTask task = new SiegeCheckupTask(siegeData);
-        siegeData.checkupTaskID = GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, task, 20L * 30);
+        siegeData.checkupTaskID = EterniaKamui.instance.getServer().getScheduler().scheduleSyncDelayedTask(EterniaKamui.instance, task, 20L * 30);
     }
 
     //ends a siege
@@ -1123,7 +1123,7 @@ public abstract class DataStore
 
         //start a cooldown for this attacker/defender pair
         Long now = Calendar.getInstance().getTimeInMillis();
-        Long cooldownEnd = now + 1000 * 60 * GriefPrevention.instance.config_siege_cooldownEndInMinutes;  //one hour from now
+        Long cooldownEnd = now + 1000 * 60 * EterniaKamui.instance.config_siege_cooldownEndInMinutes;  //one hour from now
         this.siegeCooldownRemaining.put(siegeData.attacker.getName() + "_" + siegeData.defender.getName(), cooldownEnd);
 
         //start cooldowns for every attacker/involved claim pair
@@ -1141,29 +1141,29 @@ public abstract class DataStore
         }
 
         //cancel the siege checkup task
-        GriefPrevention.instance.getServer().getScheduler().cancelTask(siegeData.checkupTaskID);
+        EterniaKamui.instance.getServer().getScheduler().cancelTask(siegeData.checkupTaskID);
 
         //notify everyone who won and lost
         if (winnerName != null && loserName != null)
         {
-            GriefPrevention.instance.getServer().broadcastMessage(winnerName + " defeated " + loserName + " in siege warfare!");
+            EterniaKamui.instance.getServer().broadcastMessage(winnerName + " defeated " + loserName + " in siege warfare!");
         }
 
         //if the claim should be opened to looting
         if (grantAccess)
         {
 
-            Player winner = GriefPrevention.instance.getServer().getPlayer(winnerName);
+            Player winner = EterniaKamui.instance.getServer().getPlayer(winnerName);
             if (winner != null)
             {
                 //notify the winner
-                GriefPrevention.sendMessage(winner, TextMode.Success, Messages.SiegeWinDoorsOpen);
+                EterniaKamui.sendMessage(winner, TextMode.Success, Messages.SiegeWinDoorsOpen);
 
                 //schedule a task to secure the claims in about 5 minutes
                 SecureClaimTask task = new SecureClaimTask(siegeData);
 
-                GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(
-                        GriefPrevention.instance, task, 20L * GriefPrevention.instance.config_siege_doorsOpenSeconds
+                EterniaKamui.instance.getServer().getScheduler().scheduleSyncDelayedTask(
+                        EterniaKamui.instance, task, 20L * EterniaKamui.instance.config_siege_doorsOpenSeconds
                 );
             }
         }
@@ -1172,9 +1172,9 @@ public abstract class DataStore
         if (drops != null)
         {
 
-            Player winner = GriefPrevention.instance.getServer().getPlayer(winnerName);
+            Player winner = EterniaKamui.instance.getServer().getPlayer(winnerName);
 
-            Player loser = GriefPrevention.instance.getServer().getPlayer(loserName);
+            Player loser = EterniaKamui.instance.getServer().getPlayer(loserName);
             if (winner != null && loser != null)
             {
                 //try to add any drops to the winner's inventory
@@ -1292,9 +1292,9 @@ public abstract class DataStore
             this.deleteClaim(claim, releasePets);
 
             //if in a creative mode world, delete the claim
-            if (GriefPrevention.instance.creativeRulesApply(claim.getLesserBoundaryCorner()))
+            if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()))
             {
-                GriefPrevention.instance.restoreClaim(claim, 0);
+                EterniaKamui.instance.restoreClaim(claim, 0);
             }
         }
     }
@@ -1335,16 +1335,16 @@ public abstract class DataStore
 
             if (!player.hasPermission("griefprevention.adminclaims") && !playerData.claimResizing.isAdminClaim() && smaller)
             {
-                if (newWidth < GriefPrevention.instance.config_claims_minWidth || newHeight < GriefPrevention.instance.config_claims_minWidth)
+                if (newWidth < EterniaKamui.instance.config_claims_minWidth || newHeight < EterniaKamui.instance.config_claims_minWidth)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.ResizeClaimTooNarrow, String.valueOf(GriefPrevention.instance.config_claims_minWidth));
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.ResizeClaimTooNarrow, String.valueOf(EterniaKamui.instance.config_claims_minWidth));
                     return;
                 }
 
                 int newArea = newWidth * newHeight;
-                if (newArea < GriefPrevention.instance.config_claims_minArea)
+                if (newArea < EterniaKamui.instance.config_claims_minArea)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.ResizeClaimInsufficientArea, String.valueOf(GriefPrevention.instance.config_claims_minArea));
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.ResizeClaimInsufficientArea, String.valueOf(EterniaKamui.instance.config_claims_minArea));
                     return;
                 }
             }
@@ -1357,7 +1357,7 @@ public abstract class DataStore
 
                 if (blocksRemainingAfter < 0)
                 {
-                    GriefPrevention.sendMessage(player, TextMode.Err, Messages.ResizeNeedMoreBlocks, String.valueOf(Math.abs(blocksRemainingAfter)));
+                    EterniaKamui.sendMessage(player, TextMode.Err, Messages.ResizeNeedMoreBlocks, String.valueOf(Math.abs(blocksRemainingAfter)));
                     this.tryAdvertiseAdminAlternatives(player);
                     return;
                 }
@@ -1393,7 +1393,7 @@ public abstract class DataStore
         }
 
         //ask the datastore to try and resize the claim, this checks for conflicts with other claims
-        CreateClaimResult result = GriefPrevention.instance.dataStore.resizeClaim(playerData.claimResizing, newx1, newx2, newy1, newy2, newz1, newz2, player);
+        CreateClaimResult result = EterniaKamui.instance.dataStore.resizeClaim(playerData.claimResizing, newx1, newx2, newy1, newy2, newz1, newz2, player);
 
         if (result.succeeded)
         {
@@ -1414,7 +1414,7 @@ public abstract class DataStore
                 {
                     PlayerData ownerData = this.getPlayerData(ownerID);
                     claimBlocksRemaining = ownerData.getRemainingClaimBlocks();
-                    OfflinePlayer owner = GriefPrevention.instance.getServer().getOfflinePlayer(ownerID);
+                    OfflinePlayer owner = EterniaKamui.instance.getServer().getOfflinePlayer(ownerID);
                     if (!owner.isOnline())
                     {
                         this.clearCachedPlayerData(ownerID);
@@ -1423,29 +1423,29 @@ public abstract class DataStore
             }
 
             //inform about success, visualize, communicate remaining blocks available
-            GriefPrevention.sendMessage(player, TextMode.Success, Messages.ClaimResizeSuccess, String.valueOf(claimBlocksRemaining));
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.ClaimResizeSuccess, String.valueOf(claimBlocksRemaining));
             Visualization visualization = Visualization.FromClaim(result.claim, player.getEyeLocation().getBlockY(), VisualizationType.Claim, player.getLocation());
             Visualization.Apply(player, visualization);
 
             //if resizing someone else's claim, make a log entry
             if (!player.getUniqueId().equals(playerData.claimResizing.ownerID) && playerData.claimResizing.parent == null)
             {
-                GriefPrevention.AddLogEntry(player.getName() + " resized " + playerData.claimResizing.getOwnerName() + "'s claim at " + GriefPrevention.getfriendlyLocationString(playerData.claimResizing.lesserBoundaryCorner) + ".");
+                EterniaKamui.AddLogEntry(player.getName() + " resized " + playerData.claimResizing.getOwnerName() + "'s claim at " + EterniaKamui.getfriendlyLocationString(playerData.claimResizing.lesserBoundaryCorner) + ".");
             }
 
             //if increased to a sufficiently large size and no subdivisions yet, send subdivision instructions
             if (oldClaim.getArea() < 1000 && result.claim.getArea() >= 1000 && result.claim.children.size() == 0 && !player.hasPermission("griefprevention.adminclaims"))
             {
-                GriefPrevention.sendMessage(player, TextMode.Info, Messages.BecomeMayor, 200L);
-                GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, 201L, DataStore.SUBDIVISION_VIDEO_URL);
+                EterniaKamui.sendMessage(player, TextMode.Info, Messages.BecomeMayor, 200L);
+                EterniaKamui.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2, 201L, DataStore.SUBDIVISION_VIDEO_URL);
             }
 
             //if in a creative mode world and shrinking an existing claim, restore any unclaimed area
-            if (smaller && GriefPrevention.instance.creativeRulesApply(oldClaim.getLesserBoundaryCorner()))
+            if (smaller && EterniaKamui.instance.creativeRulesApply(oldClaim.getLesserBoundaryCorner()))
             {
-                GriefPrevention.sendMessage(player, TextMode.Warn, Messages.UnclaimCleanupWarning);
-                GriefPrevention.instance.restoreClaim(oldClaim, 20L * 60 * 2);  //2 minutes
-                GriefPrevention.AddLogEntry(player.getName() + " shrank a claim @ " + GriefPrevention.getfriendlyLocationString(playerData.claimResizing.getLesserBoundaryCorner()));
+                EterniaKamui.sendMessage(player, TextMode.Warn, Messages.UnclaimCleanupWarning);
+                EterniaKamui.instance.restoreClaim(oldClaim, 20L * 60 * 2);  //2 minutes
+                EterniaKamui.AddLogEntry(player.getName() + " shrank a claim @ " + EterniaKamui.getfriendlyLocationString(playerData.claimResizing.getLesserBoundaryCorner()));
             }
 
             //clean up
@@ -1457,7 +1457,7 @@ public abstract class DataStore
             if (result.claim != null)
             {
                 //inform player
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.ResizeFailOverlap);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.ResizeFailOverlap);
 
                 //show the player the conflicting claim
                 Visualization visualization = Visualization.FromClaim(result.claim, player.getEyeLocation().getBlockY(), VisualizationType.ErrorClaim, player.getLocation());
@@ -1465,7 +1465,7 @@ public abstract class DataStore
             }
             else
             {
-                GriefPrevention.sendMessage(player, TextMode.Err, Messages.ResizeFailOverlapRegion);
+                EterniaKamui.sendMessage(player, TextMode.Err, Messages.ResizeFailOverlapRegion);
             }
         }
     }
@@ -1475,15 +1475,15 @@ public abstract class DataStore
     {
         if (player.hasPermission("griefprevention.adminclaims") && player.hasPermission("griefprevention.adjustclaimblocks"))
         {
-            GriefPrevention.sendMessage(player, TextMode.Info, Messages.AdvertiseACandACB);
+            EterniaKamui.sendMessage(player, TextMode.Info, Messages.AdvertiseACandACB);
         }
         else if (player.hasPermission("griefprevention.adminclaims"))
         {
-            GriefPrevention.sendMessage(player, TextMode.Info, Messages.AdvertiseAdminClaims);
+            EterniaKamui.sendMessage(player, TextMode.Info, Messages.AdvertiseAdminClaims);
         }
         else if (player.hasPermission("griefprevention.adjustclaimblocks"))
         {
-            GriefPrevention.sendMessage(player, TextMode.Info, Messages.AdvertiseACB);
+            EterniaKamui.sendMessage(player, TextMode.Info, Messages.AdvertiseACB);
         }
     }
 
@@ -1746,7 +1746,7 @@ public abstract class DataStore
             //if default is missing, log an error and use some fake data for now so that the plugin can run
             if (messageData == null)
             {
-                GriefPrevention.AddLogEntry("Missing message for " + messageID.name() + ".  Please contact the developer.");
+                EterniaKamui.AddLogEntry("Missing message for " + messageID.name() + ".  Please contact the developer.");
                 messageData = new CustomizableMessage(messageID, "Missing message!  ID: " + messageID.name() + ".  Please contact a server admin.", null);
             }
 
@@ -1775,7 +1775,7 @@ public abstract class DataStore
         }
         catch (IOException exception)
         {
-            GriefPrevention.AddLogEntry("Unable to write to the configuration file at \"" + DataStore.messagesFilePath + "\"");
+            EterniaKamui.AddLogEntry("Unable to write to the configuration file at \"" + DataStore.messagesFilePath + "\"");
         }
 
         defaults.clear();

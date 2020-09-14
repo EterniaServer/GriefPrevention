@@ -52,8 +52,8 @@ class VisualizationApplicationTask implements Runnable
         playerData.currentVisualization = visualization;
 
         //schedule automatic visualization reversion in 60 seconds.
-        GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(
-                GriefPrevention.instance,
+        EterniaKamui.instance.getServer().getScheduler().scheduleSyncDelayedTask(
+                EterniaKamui.instance,
                 new VisualizationReversionTask(player, playerData, visualization),
                 20L * 60);  //60 seconds
     }

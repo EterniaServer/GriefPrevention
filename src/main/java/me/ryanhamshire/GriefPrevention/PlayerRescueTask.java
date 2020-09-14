@@ -49,20 +49,20 @@ class PlayerRescueTask implements Runnable
         if (!player.isOnline()) return;
 
         //he no longer has a pending /trapped slash command, so he can try to use it again now
-        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = EterniaKamui.instance.dataStore.getPlayerData(player.getUniqueId());
         playerData.pendingTrapped = false;
 
         //if the player moved three or more blocks from where he used /trapped, admonish him and don't save him
         if (!player.getLocation().getWorld().equals(this.location.getWorld()) || player.getLocation().distance(this.location) > 3)
         {
-            GriefPrevention.sendMessage(player, TextMode.Err, Messages.RescueAbortedMoved);
+            EterniaKamui.sendMessage(player, TextMode.Err, Messages.RescueAbortedMoved);
             return;
         }
 
         //otherwise find a place to teleport him
         if (this.destination == null)
         {
-            this.destination = GriefPrevention.instance.ejectPlayer(this.player);
+            this.destination = EterniaKamui.instance.ejectPlayer(this.player);
         }
         else
         {
@@ -70,6 +70,6 @@ class PlayerRescueTask implements Runnable
         }
 
         //log entry, in case admins want to investigate the "trap"
-        GriefPrevention.AddLogEntry("Rescued trapped player " + player.getName() + " from " + GriefPrevention.getfriendlyLocationString(this.location) + " to " + GriefPrevention.getfriendlyLocationString(this.destination) + ".");
+        EterniaKamui.AddLogEntry("Rescued trapped player " + player.getName() + " from " + EterniaKamui.getfriendlyLocationString(this.location) + " to " + EterniaKamui.getfriendlyLocationString(this.destination) + ".");
     }
 }

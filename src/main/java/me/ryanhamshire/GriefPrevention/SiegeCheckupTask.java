@@ -34,7 +34,7 @@ class SiegeCheckupTask implements Runnable
     @Override
     public void run()
     {
-        DataStore dataStore = GriefPrevention.instance.dataStore;
+        DataStore dataStore = EterniaKamui.instance.dataStore;
         Player defender = this.siegeData.defender;
         Player attacker = this.siegeData.attacker;
 
@@ -105,6 +105,6 @@ class SiegeCheckupTask implements Runnable
     //schedules another checkup later
     private void scheduleAnotherCheck()
     {
-        this.siegeData.checkupTaskID = GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, this, 20L * 30);
+        this.siegeData.checkupTaskID = EterniaKamui.instance.getServer().getScheduler().scheduleSyncDelayedTask(EterniaKamui.instance, this, 20L * 30);
     }
 }

@@ -61,7 +61,7 @@ class PlayerKickBanTask implements Runnable
         if (this.ban)
         {
             //ban
-            GriefPrevention.banPlayer(this.player, this.reason, this.source);
+            EterniaKamui.banPlayer(this.player, this.reason, this.source);
         }
         else if (this.player.isOnline())
         {
