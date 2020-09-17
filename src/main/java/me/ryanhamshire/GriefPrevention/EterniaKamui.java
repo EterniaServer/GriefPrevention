@@ -280,8 +280,8 @@ public class EterniaKamui extends JavaPlugin {
                     "explosions INT(1), " +
                     "keeplevel INT(1), " +
                     "fluid INT(1), " +
-                    "enter TEXT, " +
-                    "exit TEXT);", false);
+                    "enterm TEXT, " +
+                    "exitm TEXT);", false);
         } else {
             EQueries.executeQuery("CREATE TABLE IF NOT EXISTS ek_worlds " +
                     "(name VARCHAR(36), " +
@@ -295,8 +295,8 @@ public class EterniaKamui extends JavaPlugin {
                     "explosions INTEGER(1), " +
                     "keeplevel INTEGER(1), " +
                     "fluid INTEGER(1), " +
-                    "enter TEXT, " +
-                    "exit TEXT);", false);
+                    "enterm TEXT, " +
+                    "exitm TEXT);", false);
         }
 
         EterniaLib.getManager().getCommandCompletions().registerStaticCompletion("worldenv", PluginVars.enviroments);

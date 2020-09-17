@@ -373,16 +373,6 @@ public class EntityEventHandler implements Listener
         }
     }
 
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
-    public void onCreatureSpawn(CreatureSpawnEvent event) {
-        Claim claim = this.dataStore.getClaimAt(event.getEntity().getLocation(), true, null);
-        if (PluginVars.claimFlags.containsKey(claim.getID())) {
-            if (!PluginVars.claimFlags.get(claim.getID()).isCreatureSpawn()) {
-                event.setCancelled(true);
-            }
-        }
-    }
-
     //when an entity explodes...
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
     public void onEntityExplode(EntityExplodeEvent explodeEvent)
@@ -541,10 +531,20 @@ public class EntityEventHandler implements Listener
         }
     }
 
-    //when a creature spawns...
     @EventHandler(priority = EventPriority.LOWEST)
     public void onEntitySpawn(CreatureSpawnEvent event)
     {
+
+        Claim claim = this.dataStore.getClaimAt(event.getEntity().getLocation(), false, null);
+        if (claim != null && PluginVars.claimFlags.containsKey(claim.getID())) {
+            if (!PluginVars.claimFlags.get(claim.getID()).isCreatureSpawn()) {
+                if (event.getEntity() instanceof Monster) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+        }
+
         //these rules apply only to creative worlds
         if (!EterniaKamui.instance.creativeRulesApply(event.getLocation())) return;
 
@@ -557,13 +557,12 @@ public class EntityEventHandler implements Listener
         }
 
         //otherwise, just apply the limit on total entities per claim (and no spawning in the wilderness!)
-        Claim claim = this.dataStore.getClaimAt(event.getLocation(), false, null);
         if (claim == null || claim.allowMoreEntities(true) != null)
         {
             event.setCancelled(true);
-            return;
         }
     }
+
 
     //when an entity dies...
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

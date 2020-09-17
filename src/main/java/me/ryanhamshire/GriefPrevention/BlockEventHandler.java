@@ -712,8 +712,6 @@ public class BlockEventHandler implements Listener {
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
     public void onBlockFromTo(BlockFromToEvent spreadEvent) {
-        //always allow fluids to flow straight down
-        if (spreadEvent.getFace() == BlockFace.DOWN) return;
 
         //don't track in worlds where claims are not enabled
         if (!EterniaKamui.instance.claimsEnabledForWorld(spreadEvent.getBlock().getWorld())) return;

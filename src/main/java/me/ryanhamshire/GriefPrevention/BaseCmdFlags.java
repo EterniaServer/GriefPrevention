@@ -129,8 +129,8 @@ public class BaseCmdFlags extends BaseCommand {
             claimFlag.setExplosions(resultSet.getInt("explosions"));
             claimFlag.setKeepLevel(resultSet.getInt("keeplevel"));
             claimFlag.setLiquidFluid(resultSet.getInt("fluid"));
-            claimFlag.setEnterMessage(resultSet.getString("enter"));
-            claimFlag.setExitMessage(resultSet.getString("exit"));
+            claimFlag.setEnterMessage(resultSet.getString("enterm"));
+            claimFlag.setExitMessage(resultSet.getString("exitm"));
             PluginVars.claimFlags.put(resultSet.getLong("claimid"), claimFlag);
         }
     }
@@ -146,9 +146,9 @@ public class BaseCmdFlags extends BaseCommand {
         Claim claim = EterniaKamui.instance.dataStore.getClaimAt(player.getLocation(), true, null);
         if (claim != null) {
             if (claim.getOwnerName().equals(player.getName())) {
-                if (PluginVars.claimFlags.containsKey(claim.getID())) {
+                if (!PluginVars.claimFlags.containsKey(claim.getID())) {
                     PluginVars.claimFlags.put(claim.getID(), new ClaimFlag());
-                    EQueries.executeQuery("INSERT INTO ek_flags (claimid, mobspawn, fluid) ('" + claim.getID() + "', '" + 1 + "', '" + 1 + "');");
+                    EQueries.executeQuery("INSERT INTO ek_flags (claimid, mobspawn, fluid) VALUES ('" + claim.getID() + "', '" + 1 + "', '" + 1 + "');");
                 }
                 ClaimFlag claimFlag = PluginVars.claimFlags.get(claim.getID());
                 Inventory gui = Bukkit.getServer().createInventory(player, 9, "EterniaFlags");
