@@ -1,6 +1,6 @@
 name: EterniaKamui
-main: me.ryanhamshire.GriefPrevention.EterniaKamui
-softdepend: [Vault, Multiverse-Core, My_Worlds, MystCraft, Transporter, TheUnderground, WorldGuard, WorldEdit, RoyalCommands, MultiWorld, Denizen, Hyperconomy]
+main: br.com.eterniaserver.eterniakamui.EterniaKamui
+softdepend: [Vault, WorldGuard, WorldEdit, EterniaServer]
 dev-url: https://dev.bukkit.org/projects/grief-prevention
 depend: [EterniaLib]
 loadbefore: [TheUnderground]
