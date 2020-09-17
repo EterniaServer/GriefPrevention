@@ -896,6 +896,14 @@ class PlayerEventHandler implements Listener
         PlayerData playerData = instance.dataStore.getPlayerData(player.getUniqueId());
         playerData.dropsAreUnlocked = false;
         playerData.receivedDropUnlockAdvertisement = false;
+
+        Claim claim = this.dataStore.getClaimAt(player.getLocation(), false, playerData.lastClaim);
+        if (PluginVars.claimFlags.containsKey(claim.getID())) {
+            if (PluginVars.claimFlags.get(claim.getID()).isKeepLevel()) {
+                event.setDroppedExp(0);
+                event.setKeepLevel(true);
+            }
+        }
     }
 
     //when a player gets kicked...

@@ -33,14 +33,21 @@ public class BaseCmdMultiVerse extends BaseCommand {
 
     public BaseCmdMultiVerse() {
 
-        EterniaLib.getConnections().executeSQLQuery(connection -> {
-            final PreparedStatement getHashMap = connection.prepareStatement("SELECT * FROM ek_worlds;");
-            final ResultSet resultSet = getHashMap.executeQuery();
-            getWorlds(resultSet);
-            getHashMap.close();
-            resultSet.close();
-        });
-
+        if (EterniaLib.getMySQL()) {
+            EterniaLib.getConnections().executeSQLQuery(connection -> {
+                final PreparedStatement getHashMap = connection.prepareStatement("SELECT * FROM ek_worlds;");
+                final ResultSet resultSet = getHashMap.executeQuery();
+                getWorlds(resultSet);
+                getHashMap.close();
+                resultSet.close();
+            });
+        } else {
+            try (PreparedStatement getHashMap = Connections.getSQLite().prepareStatement("SELECT * FROM ek_worlds;"); ResultSet resultSet = getHashMap.executeQuery()) {
+                getWorlds(resultSet);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     @Default
@@ -61,12 +68,11 @@ public class BaseCmdMultiVerse extends BaseCommand {
         worldType = worldType.toLowerCase();
         if (!PluginVars.worlds.contains(worldName)) {
             createWorld(worldName, worldEnviroment, worldType);
-            // todo adicionar mensagem.
-
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.WorldCreated, worldName, worldEnviroment, worldType, String.valueOf(invClear));
             PluginVars.invClear.put(worldName, invClear);
             EQueries.executeQuery("INSERT INTO ek_worlds (name, enviroment, type, invclear) ('" + worldName + "', '" + worldEnviroment + "', '" + worldType + "', '" + invClear + "');");
         } else {
-            // todo adicionar mensagem.
+            EterniaKamui.sendMessage(player, TextMode.Success, Messages.WorldAlready, worldName);
         }
     }
 
@@ -80,7 +86,7 @@ public class BaseCmdMultiVerse extends BaseCommand {
         if (removeWorld(player, worldName)) return;
 
         Bukkit.getServer().unloadWorld(worldName, true);
-        // todo adicionar mensagem.
+        EterniaKamui.sendMessage(player, TextMode.Success, Messages.WorldRemoved, worldName);
     }
 
     @Subcommand("delete")
@@ -95,18 +101,17 @@ public class BaseCmdMultiVerse extends BaseCommand {
         Bukkit.getServer().unloadWorld(worldName, true);
         deleteDir(new File("." + File.separator + worldName));
         EQueries.executeQuery("DELETE FROM ek_worlds WHERE name='" + worldName + "';");
-        // todo adicionar mensagem.
-
+        EterniaKamui.sendMessage(player, TextMode.Success, Messages.WorldRemoved, worldName);
     }
 
     public boolean removeWorld(Player player, String worldName) {
         if (PluginVars.baseWorlds.contains(worldName)) {
-            // todo adicionar mensagem.
+            EterniaKamui.sendMessage(player, TextMode.Err, Messages.WorldBase);
             return true;
         }
 
         if (!PluginVars.worlds.contains(worldName)) {
-            // todo adicionar mensagem.
+            EterniaKamui.sendMessage(player, TextMode.Err, Messages.WorldNoExists);
             return true;
         }
         return false;
@@ -131,13 +136,11 @@ public class BaseCmdMultiVerse extends BaseCommand {
     public void onTp(Player player, Double x, Double y, Double z, String worldName) {
         worldName = worldName.toLowerCase();
         if (!PluginVars.worlds.contains(worldName)) {
-            // todo adicionar mensagem.
+            EterniaKamui.sendMessage(player, TextMode.Err, Messages.WorldNoExists);
             return;
         }
 
-        PaperLib.teleportAsync(player, new Location(Bukkit.getWorld(worldName), x, y, z, 0, 0)).thenRun(() -> {
-            // todo adicionar mensagem.
-        });
+        PaperLib.teleportAsync(player, new Location(Bukkit.getWorld(worldName), x, y, z, 0, 0));
     }
 
     private void getWorlds(ResultSet resultSet) throws SQLException {
@@ -153,7 +156,6 @@ public class BaseCmdMultiVerse extends BaseCommand {
         worldCreator.environment(getEnv(worldEnviroment));
         Bukkit.createWorld(getType(worldCreator, worldType));
         PluginVars.worlds.add(worldName);
-        // todo adicionar mensagem.
     }
 
     private WorldCreator getType(WorldCreator worldCreator, String type) {
@@ -183,9 +185,5 @@ public class BaseCmdMultiVerse extends BaseCommand {
                 return World.Environment.NORMAL;
         }
     }
-
-    private void sendConsole(String message) {
-        Bukkit.getConsoleSender().sendMessage(message);
-    }
-
+    
 }

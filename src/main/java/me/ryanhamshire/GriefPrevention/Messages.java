@@ -18,8 +18,15 @@
 
 package me.ryanhamshire.GriefPrevention;
 
-public enum Messages
-{
+public enum Messages {
+    NoClaim,
+    NoOwner,
+    WorldCreated,
+    WorldAlready,
+    WorldDeleted,
+    WorldRemoved,
+    WorldBase,
+    WorldNoExists,
     RespectingClaims,
     IgnoringClaims,
     SuccessfulAbandon,

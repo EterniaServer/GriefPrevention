@@ -18,8 +18,11 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import br.com.eterniaserver.eternialib.EQueries;
+
 import me.ryanhamshire.GriefPrevention.events.PreventPvPEvent;
 import me.ryanhamshire.GriefPrevention.events.ProtectDeathDropsEvent;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -83,6 +86,7 @@ import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.hanging.HangingBreakEvent;
 import org.bukkit.event.hanging.HangingBreakEvent.RemoveCause;
 import org.bukkit.event.hanging.HangingPlaceEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.vehicle.VehicleDamageEvent;
 import org.bukkit.event.weather.LightningStrikeEvent;
 import org.bukkit.inventory.ItemStack;
@@ -279,6 +283,74 @@ public class EntityEventHandler implements Listener
         if (!EterniaKamui.instance.config_zombiesBreakDoors) event.setCancelled(true);
     }
 
+    @EventHandler (ignoreCancelled = true, priority = EventPriority.LOWEST)
+    public void onEntityInventoryClick(InventoryClickEvent e) {
+        if (e.getView().getTitle().equals("EterniaFlags")) {
+            menuGui((Player) e.getWhoClicked(), e.getSlot(), e);
+            e.setCancelled(true);
+        }
+    }
+
+    private void menuGui(final Player player, int slotInt, InventoryClickEvent e) {
+        Claim claim = EterniaKamui.instance.dataStore.getClaimAt(player.getLocation(), true, null);
+        ClaimFlag claimFlag = PluginVars.claimFlags.get(claim.getID());
+        int value = 0;
+        switch (slotInt) {
+            case 2:
+                if (claimFlag.isCreatureSpawn()) {
+                    e.getView().setItem(slotInt, BaseCmdFlags.guiItensDisable.get(2));
+                } else {
+                    e.getView().setItem(slotInt, BaseCmdFlags.guiItensEnable.get(2));
+                    value = 1;
+                }
+                EQueries.executeQuery("UPDATE ek_flags SET mobspawn='" + value + "' WHERE claimid='" + claim.getID() + "';");
+                claimFlag.setCreatureSpawn(value);
+                break;
+            case 3:
+                if (claimFlag.isAllowPvP()) {
+                    e.getView().setItem(slotInt, BaseCmdFlags.guiItensDisable.get(3));
+                } else {
+                    e.getView().setItem(slotInt, BaseCmdFlags.guiItensEnable.get(3));
+                    value = 1;
+                }
+                EQueries.executeQuery("UPDATE ek_flags SET pvp='" + value + "' WHERE claimid='" + claim.getID() + "';");
+                claimFlag.setAllowPvP(value);
+                break;
+            case 4:
+                if (claimFlag.isExplosions()) {
+                    e.getView().setItem(slotInt, BaseCmdFlags.guiItensDisable.get(4));
+                } else {
+                    e.getView().setItem(slotInt, BaseCmdFlags.guiItensEnable.get(4));
+                    value = 1;
+                }
+                EQueries.executeQuery("UPDATE ek_flags SET explosions='" + value + "' WHERE claimid='" + claim.getID() + "';");
+                claimFlag.setExplosions(value);
+                break;
+            case 5:
+                if (claimFlag.isLiquidFluid()) {
+                    e.getView().setItem(slotInt, BaseCmdFlags.guiItensDisable.get(5));
+                } else {
+                    e.getView().setItem(slotInt, BaseCmdFlags.guiItensEnable.get(5));
+                    value = 1;
+                }
+                EQueries.executeQuery("UPDATE ek_flags SET fluid='" + value + "' WHERE claimid='" + claim.getID() + "';");
+                claimFlag.setLiquidFluid(value);
+                break;
+            case 6:
+                if (claimFlag.isKeepLevel()) {
+                    e.getView().setItem(slotInt, BaseCmdFlags.guiItensDisable.get(6));
+                } else {
+                    e.getView().setItem(slotInt, BaseCmdFlags.guiItensEnable.get(9));
+                    value = 1;
+                }
+                EQueries.executeQuery("UPDATE ek_flags SET keeplevel='" + value + "' WHERE claimid='" + claim.getID() + "';");
+                claimFlag.setKeepLevel(value);
+                break;
+            default:
+                break;
+        }
+    }
+
     //don't allow entities to trample crops
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
     public void onEntityInteract(EntityInteractEvent event)
@@ -297,6 +369,16 @@ public class EntityEventHandler implements Listener
                 {
                     event.setCancelled(true);
                 }
+            }
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
+    public void onCreatureSpawn(CreatureSpawnEvent event) {
+        Claim claim = this.dataStore.getClaimAt(event.getEntity().getLocation(), true, null);
+        if (PluginVars.claimFlags.containsKey(claim.getID())) {
+            if (!PluginVars.claimFlags.get(claim.getID()).isCreatureSpawn()) {
+                event.setCancelled(true);
             }
         }
     }
@@ -329,15 +411,10 @@ public class EntityEventHandler implements Listener
         boolean applySurfaceRules = world.getEnvironment() == Environment.NORMAL && ((isCreeper && EterniaKamui.instance.config_blockSurfaceCreeperExplosions) || (!isCreeper && EterniaKamui.instance.config_blockSurfaceOtherExplosions));
 
         //special rule for creative worlds: explosions don't destroy anything
-        if (EterniaKamui.instance.creativeRulesApply(location))
-        {
-            for (int i = 0; i < blocks.size(); i++)
-            {
-                Block block = blocks.get(i);
-
+        if (EterniaKamui.instance.creativeRulesApply(location)) {
+            for (int i = 0; i < blocks.size(); i++) {
                 blocks.remove(i--);
             }
-
             return;
         }
 
@@ -359,7 +436,7 @@ public class EntityEventHandler implements Listener
             }
 
             //if yes, apply claim exemptions if they should apply
-            if (claim != null && (claim.areExplosivesAllowed || !EterniaKamui.instance.config_blockClaimExplosions))
+            if (claim != null && (claim.areExplosivesAllowed || !EterniaKamui.instance.config_blockClaimExplosions || (PluginVars.claimFlags.containsKey(claim.getID()) && PluginVars.claimFlags.get(claim.getID()).isExplosions())))
             {
                 explodedBlocks.add(block);
                 continue;
@@ -831,6 +908,9 @@ public class EntityEventHandler implements Listener
                             Bukkit.getPluginManager().callEvent(pvpEvent);
                             if (!pvpEvent.isCancelled())
                             {
+                                if (PluginVars.claimFlags.containsKey(damagedClaim.getID())) {
+                                    if (PluginVars.claimFlags.get(damagedClaim.getID()).isAllowPvP()) return;
+                                }
                                 event.setCancelled(true);
                             }
                             return;
@@ -885,21 +965,19 @@ public class EntityEventHandler implements Listener
                 }
 
                 //FEATURE: prevent players from engaging in PvP combat inside land claims (when it's disabled)
-                if (EterniaKamui.instance.config_pvp_noCombatInPlayerLandClaims || EterniaKamui.instance.config_pvp_noCombatInAdminLandClaims)
-                {
+                if (EterniaKamui.instance.config_pvp_noCombatInPlayerLandClaims || EterniaKamui.instance.config_pvp_noCombatInAdminLandClaims) {
                     Claim attackerClaim = this.dataStore.getClaimAt(attacker.getLocation(), false, attackerData.lastClaim);
-                    if (!attackerData.ignoreClaims)
-                    {
+                    if (!attackerData.ignoreClaims) {
                         if (attackerClaim != null && //ignore claims mode allows for pvp inside land claims
                                 !attackerData.inPvpCombat() &&
-                                EterniaKamui.instance.claimIsPvPSafeZone(attackerClaim))
-                        {
+                                EterniaKamui.instance.claimIsPvPSafeZone(attackerClaim)) {
                             attackerData.lastClaim = attackerClaim;
                             PreventPvPEvent pvpEvent = new PreventPvPEvent(attackerClaim);
                             Bukkit.getPluginManager().callEvent(pvpEvent);
-                            if (!pvpEvent.isCancelled())
-                            {
-                                event.setCancelled(true);
+                            if (!pvpEvent.isCancelled()) {
+                                if (PluginVars.claimFlags.containsKey(attackerClaim.getID())) {
+                                    if (PluginVars.claimFlags.get(attackerClaim.getID()).isAllowPvP()) return;
+                                }                                event.setCancelled(true);
                                 if (sendErrorMessagesToPlayers)
                                     EterniaKamui.sendMessage(attacker, TextMode.Err, Messages.CantFightWhileImmune);
                             }
@@ -909,13 +987,14 @@ public class EntityEventHandler implements Listener
                         Claim defenderClaim = this.dataStore.getClaimAt(defender.getLocation(), false, defenderData.lastClaim);
                         if (defenderClaim != null &&
                                 !defenderData.inPvpCombat() &&
-                                EterniaKamui.instance.claimIsPvPSafeZone(defenderClaim))
-                        {
+                                EterniaKamui.instance.claimIsPvPSafeZone(defenderClaim)) {
                             defenderData.lastClaim = defenderClaim;
                             PreventPvPEvent pvpEvent = new PreventPvPEvent(defenderClaim);
                             Bukkit.getPluginManager().callEvent(pvpEvent);
-                            if (!pvpEvent.isCancelled())
-                            {
+                            if (!pvpEvent.isCancelled()) {
+                                if (PluginVars.claimFlags.containsKey(defenderClaim.getID())) {
+                                    if (PluginVars.claimFlags.get(defenderClaim.getID()).isAllowPvP()) return;
+                                }
                                 event.setCancelled(true);
                                 if (sendErrorMessagesToPlayers)
                                     EterniaKamui.sendMessage(attacker, TextMode.Err, Messages.PlayerInPvPSafeZone);

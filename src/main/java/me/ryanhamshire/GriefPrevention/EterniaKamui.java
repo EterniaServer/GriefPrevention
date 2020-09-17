@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import br.com.eterniaserver.eternialib.EQueries;
 import br.com.eterniaserver.eternialib.EterniaLib;
 import me.ryanhamshire.GriefPrevention.DataStore.NoTransferException;
 import me.ryanhamshire.GriefPrevention.events.PreventBlockBreakEvent;
@@ -69,12 +70,9 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class EterniaKamui extends JavaPlugin
-{
+public class EterniaKamui extends JavaPlugin {
     //for convenience, a reference to the instance of this plugin
     public static EterniaKamui instance;
-    public static final YamlConfiguration serverConfig = new YamlConfiguration();
-    public static final YamlConfiguration messagesConfig = new YamlConfiguration();
 
     //for logging to the console and log file
     private static Logger log;
@@ -210,6 +208,7 @@ public class EterniaKamui extends JavaPlugin
     public boolean config_limitTreeGrowth;                          //whether trees should be prevented from growing into a claim from outside
     public boolean config_checkPistonMovement;                      //whether to check piston movement
     public boolean config_pistonsInClaimsOnly;                      //whether pistons are limited to only move blocks located within the piston's land claim
+    public PistonMode config_pistonMovement;
 
     public boolean config_advanced_fixNegativeClaimblockAmounts;    //whether to attempt to fix negative claim block amounts (some addons cause/assume players can go into negative amounts)
     public int config_advanced_claim_expiration_check_rate;            //How often GP should check for expired claims, amount in seconds
@@ -242,28 +241,23 @@ public class EterniaKamui extends JavaPlugin
     public static final int NOTIFICATION_SECONDS = 20;
 
     //adds a server log entry
-    public static synchronized void AddLogEntry(String entry, CustomLogEntryTypes customLogType, boolean excludeFromServerLogs)
-    {
-        if (customLogType != null && EterniaKamui.instance.customLogger != null)
-        {
+    public static synchronized void AddLogEntry(String entry, CustomLogEntryTypes customLogType, boolean excludeFromServerLogs) {
+        if (customLogType != null && EterniaKamui.instance.customLogger != null) {
             EterniaKamui.instance.customLogger.AddEntry(entry, customLogType);
         }
         if (!excludeFromServerLogs) log.info(entry);
     }
 
-    public static synchronized void AddLogEntry(String entry, CustomLogEntryTypes customLogType)
-    {
+    public static synchronized void AddLogEntry(String entry, CustomLogEntryTypes customLogType) {
         AddLogEntry(entry, customLogType, false);
     }
 
-    public static synchronized void AddLogEntry(String entry)
-    {
+    public static synchronized void AddLogEntry(String entry) {
         AddLogEntry(entry, CustomLogEntryTypes.Debug);
     }
 
     //initializes well...   everything
-    public void onEnable()
-    {
+    public void onEnable() {
         instance = this;
         log = instance.getLogger();
 
@@ -271,9 +265,44 @@ public class EterniaKamui extends JavaPlugin
         PluginVars.worlds.add("world_nether");
         PluginVars.worlds.add("world_the_end");
 
+        if (EterniaLib.getMySQL()) {
+            EQueries.executeQuery("CREATE TABLE IF NOT EXISTS ek_worlds " +
+                    "(id INT AUTO_INCREMENT NOT NULL PRIMARY KEY, " +
+                    "name VARCHAR(36), " +
+                    "enviroment VARCHAR(36), " +
+                    "type VARCHAR(36), " +
+                    "invclear INT(1));", false);
+            EQueries.executeQuery("CREATE TABLE IF NOT EXISTS ek_flags " +
+                    "(id INT AUTO_INCREMENT NOT NULL PRIMARY KEY, " +
+                    "claimid BIGINT(20), " +
+                    "pvp INT(1), " +
+                    "mobspawn INT(1), " +
+                    "explosions INT(1), " +
+                    "keeplevel INT(1), " +
+                    "fluid INT(1), " +
+                    "enter TEXT, " +
+                    "exit TEXT);", false);
+        } else {
+            EQueries.executeQuery("CREATE TABLE IF NOT EXISTS ek_worlds " +
+                    "(name VARCHAR(36), " +
+                    "enviroment VARCHAR(36), " +
+                    "type VARCHAR(36), " +
+                    "invclear INTEGER(1));", false);
+            EQueries.executeQuery("CREATE TABLE IF NOT EXISTS ek_flags " +
+                    "(claimid BIGINT(20), " +
+                    "pvp INTEGER(1), " +
+                    "mobspawn INTEGER(1), " +
+                    "explosions INTEGER(1), " +
+                    "keeplevel INTEGER(1), " +
+                    "fluid INTEGER(1), " +
+                    "enter TEXT, " +
+                    "exit TEXT);", false);
+        }
+
         EterniaLib.getManager().getCommandCompletions().registerStaticCompletion("worldenv", PluginVars.enviroments);
         EterniaLib.getManager().getCommandCompletions().registerStaticCompletion("worldtyp", PluginVars.types);
         EterniaLib.getManager().registerCommand(new BaseCmdMultiVerse());
+        EterniaLib.getManager().registerCommand(new BaseCmdFlags());
 
         this.loadConfig();
 
@@ -282,14 +311,11 @@ public class EterniaKamui extends JavaPlugin
         AddLogEntry("Finished loading configuration.");
 
         //when datastore initializes, it loads player and claim data, and posts some stats to the log
-        if (this.databaseUrl.length() > 0)
-        {
-            try
-            {
+        if (this.databaseUrl.length() > 0) {
+            try {
                 DatabaseDataStore databaseStore = new DatabaseDataStore(this.databaseUrl, this.databaseUserName, this.databasePassword);
 
-                if (FlatFileDataStore.hasData())
-                {
+                if (FlatFileDataStore.hasData()) {
                     EterniaKamui.AddLogEntry("There appears to be some data on the hard drive.  Migrating those data to the database...");
                     FlatFileDataStore flatFileStore = new FlatFileDataStore();
                     this.dataStore = flatFileStore;
@@ -298,9 +324,7 @@ public class EterniaKamui extends JavaPlugin
                 }
 
                 this.dataStore = databaseStore;
-            }
-            catch (Exception e)
-            {
+            } catch (Exception e) {
                 EterniaKamui.AddLogEntry("Because there was a problem with the database, GriefPrevention will not function properly.  Either update the database config settings resolve the issue, or delete those lines from your config.yml so that GriefPrevention can use the file system to store data.");
                 e.printStackTrace();
                 this.getServer().getPluginManager().disablePlugin(this);
@@ -310,13 +334,10 @@ public class EterniaKamui extends JavaPlugin
 
         //if not using the database because it's not configured or because there was a problem, use the file system to store data
         //this is the preferred method, as it's simpler than the database scenario
-        if (this.dataStore == null)
-        {
+        if (this.dataStore == null) {
             File oldclaimdata = new File(getDataFolder(), "ClaimData");
-            if (oldclaimdata.exists())
-            {
-                if (!FlatFileDataStore.hasData())
-                {
+            if (oldclaimdata.exists()) {
+                if (!FlatFileDataStore.hasData()) {
                     File claimdata = new File("plugins" + File.separator + "GriefPreventionData" + File.separator + "ClaimData");
                     oldclaimdata.renameTo(claimdata);
                     File oldplayerdata = new File(getDataFolder(), "PlayerData");
@@ -324,12 +345,9 @@ public class EterniaKamui extends JavaPlugin
                     oldplayerdata.renameTo(playerdata);
                 }
             }
-            try
-            {
+            try {
                 this.dataStore = new FlatFileDataStore();
-            }
-            catch (Exception e)
-            {
+            } catch (Exception e) {
                 EterniaKamui.AddLogEntry("Unable to initialize the file system data store.  Details:");
                 EterniaKamui.AddLogEntry(e.getMessage());
                 e.printStackTrace();
@@ -341,8 +359,7 @@ public class EterniaKamui extends JavaPlugin
 
         //unless claim block accrual is disabled, start the recurring per 10 minute event to give claim blocks to online players
         //20L ~ 1 second
-        if (this.config_claims_blocksAccruedPerHour_default > 0)
-        {
+        if (this.config_claims_blocksAccruedPerHour_default > 0) {
             DeliverClaimBlocksTask task = new DeliverClaimBlocksTask(null, this);
             this.getServer().getScheduler().scheduleSyncRepeatingTask(this, task, 20L * 60 * 10, 20L * 60 * 10);
         }
@@ -371,8 +388,7 @@ public class EterniaKamui extends JavaPlugin
         pluginManager.registerEvents(entityEventHandler, this);
 
         //if economy is enabled
-        if (this.config_economy_claimBlocksPurchaseCost > 0 || this.config_economy_claimBlocksSellValue > 0)
-        {
+        if (this.config_economy_claimBlocksPurchaseCost > 0 || this.config_economy_claimBlocksSellValue > 0) {
             //try to load Vault
             EterniaKamui.AddLogEntry("GriefPrevention requires Vault for economy integration.");
             EterniaKamui.AddLogEntry("Attempting to load Vault...");
@@ -381,27 +397,23 @@ public class EterniaKamui extends JavaPlugin
 
             //ask Vault to hook into an economy plugin
             EterniaKamui.AddLogEntry("Looking for a Vault-compatible economy plugin...");
-            if (economyProvider != null)
-            {
+            if (economyProvider != null) {
                 EterniaKamui.economy = economyProvider.getProvider();
 
                 //on success, display success message
-                if (EterniaKamui.economy != null)
-                {
+                if (EterniaKamui.economy != null) {
                     EterniaKamui.AddLogEntry("Hooked into economy: " + EterniaKamui.economy.getName() + ".");
                     EterniaKamui.AddLogEntry("Ready to buy/sell claim blocks!");
                 }
 
                 //otherwise error message
-                else
-                {
+                else {
                     EterniaKamui.AddLogEntry("ERROR: Vault was unable to find a supported economy plugin.  Either install a Vault-compatible economy plugin, or set both of the economy config variables to zero.");
                 }
             }
 
             //another error case
-            else
-            {
+            else {
                 EterniaKamui.AddLogEntry("ERROR: Vault was unable to find a supported economy plugin.  Either install a Vault-compatible economy plugin, or set both of the economy config variables to zero.");
             }
         }
@@ -415,22 +427,19 @@ public class EterniaKamui extends JavaPlugin
         //load ignore lists for any already-online players
         @SuppressWarnings("unchecked")
         Collection<Player> players = (Collection<Player>) EterniaKamui.instance.getServer().getOnlinePlayers();
-        for (Player player : players)
-        {
+        for (Player player : players) {
             new IgnoreLoaderThread(player.getUniqueId(), this.dataStore.getPlayerData(player.getUniqueId()).ignoredPlayers).start();
         }
 
         AddLogEntry("Boot finished.");
 
-        try
-        {
+        try {
             new MetricsHandler(this, dataMode);
+        } catch (Throwable ignored) {
         }
-        catch (Throwable ignored) {}
     }
 
-    private void loadConfig()
-    {
+    private void loadConfig() {
         //load the config if it exists
         FileConfiguration config = YamlConfiguration.loadConfiguration(new File(DataStore.configFilePath));
         FileConfiguration outConfig = new YamlConfiguration();
@@ -443,12 +452,10 @@ public class EterniaKamui extends JavaPlugin
         List<String> deprecated_claimsEnabledWorldNames = config.getStringList("GriefPrevention.Claims.Worlds");
 
         //validate that list
-        for (int i = 0; i < deprecated_claimsEnabledWorldNames.size(); i++)
-        {
+        for (int i = 0; i < deprecated_claimsEnabledWorldNames.size(); i++) {
             String worldName = deprecated_claimsEnabledWorldNames.get(i);
             World world = this.getServer().getWorld(worldName);
-            if (world == null)
-            {
+            if (world == null) {
                 deprecated_claimsEnabledWorldNames.remove(i--);
             }
         }
@@ -457,12 +464,10 @@ public class EterniaKamui extends JavaPlugin
         List<String> deprecated_creativeClaimsEnabledWorldNames = config.getStringList("GriefPrevention.Claims.CreativeRulesWorlds");
 
         //validate that list
-        for (int i = 0; i < deprecated_creativeClaimsEnabledWorldNames.size(); i++)
-        {
+        for (int i = 0; i < deprecated_creativeClaimsEnabledWorldNames.size(); i++) {
             String worldName = deprecated_creativeClaimsEnabledWorldNames.get(i);
             World world = this.getServer().getWorld(worldName);
-            if (world == null)
-            {
+            if (world == null) {
                 deprecated_claimsEnabledWorldNames.remove(i--);
             }
         }
@@ -475,21 +480,16 @@ public class EterniaKamui extends JavaPlugin
         //decide claim mode for each world
         this.config_claims_worldModes = new ConcurrentHashMap<World, ClaimsMode>();
         this.config_creativeWorldsExist = false;
-        for (World world : worlds)
-        {
+        for (World world : worlds) {
             //is it specified in the config file?
             String configSetting = config.getString("GriefPrevention.Claims.Mode." + world.getName());
-            if (configSetting != null)
-            {
+            if (configSetting != null) {
                 ClaimsMode claimsMode = this.configStringToClaimsMode(configSetting);
-                if (claimsMode != null)
-                {
+                if (claimsMode != null) {
                     this.config_claims_worldModes.put(world, claimsMode);
                     if (claimsMode == ClaimsMode.Creative) this.config_creativeWorldsExist = true;
                     continue;
-                }
-                else
-                {
+                } else {
                     EterniaKamui.AddLogEntry("Error: Invalid claim mode \"" + configSetting + "\".  Options are Survival, Creative, and Disabled.");
                     this.config_claims_worldModes.put(world, ClaimsMode.Creative);
                     this.config_creativeWorldsExist = true;
@@ -497,39 +497,28 @@ public class EterniaKamui extends JavaPlugin
             }
 
             //was it specified in a deprecated config node?
-            if (deprecated_creativeClaimsEnabledWorldNames.contains(world.getName()))
-            {
+            if (deprecated_creativeClaimsEnabledWorldNames.contains(world.getName())) {
                 this.config_claims_worldModes.put(world, ClaimsMode.Creative);
                 this.config_creativeWorldsExist = true;
-            }
-            else if (deprecated_claimsEnabledWorldNames.contains(world.getName()))
-            {
+            } else if (deprecated_claimsEnabledWorldNames.contains(world.getName())) {
                 this.config_claims_worldModes.put(world, ClaimsMode.Survival);
             }
 
             //does the world's name indicate its purpose?
-            else if (world.getName().toLowerCase().contains("survival"))
-            {
+            else if (world.getName().toLowerCase().contains("survival")) {
                 this.config_claims_worldModes.put(world, ClaimsMode.Survival);
-            }
-            else if (world.getName().toLowerCase().contains("creative"))
-            {
+            } else if (world.getName().toLowerCase().contains("creative")) {
                 this.config_claims_worldModes.put(world, ClaimsMode.Creative);
                 this.config_creativeWorldsExist = true;
             }
 
             //decide a default based on server type and world type
-            else if (this.getServer().getDefaultGameMode() == GameMode.CREATIVE)
-            {
+            else if (this.getServer().getDefaultGameMode() == GameMode.CREATIVE) {
                 this.config_claims_worldModes.put(world, ClaimsMode.Creative);
                 this.config_creativeWorldsExist = true;
-            }
-            else if (world.getEnvironment() == Environment.NORMAL)
-            {
+            } else if (world.getEnvironment() == Environment.NORMAL) {
                 this.config_claims_worldModes.put(world, ClaimsMode.Survival);
-            }
-            else
-            {
+            } else {
                 this.config_claims_worldModes.put(world, ClaimsMode.Disabled);
             }
 
@@ -537,24 +526,21 @@ public class EterniaKamui extends JavaPlugin
             //then default to survival mode for safety's sake (to protect any admin claims which may 
             //have been created there)
             if (this.config_claims_worldModes.get(world) == ClaimsMode.Disabled &&
-                    deprecated_claimsEnabledWorldNames.size() > 0)
-            {
+                    deprecated_claimsEnabledWorldNames.size() > 0) {
                 this.config_claims_worldModes.put(world, ClaimsMode.Survival);
             }
         }
 
         //pvp worlds list
         this.config_pvp_specifiedWorlds = new HashMap<World, Boolean>();
-        for (World world : worlds)
-        {
+        for (World world : worlds) {
             boolean pvpWorld = config.getBoolean("GriefPrevention.PvP.RulesEnabledInWorld." + world.getName(), world.getPVP());
             this.config_pvp_specifiedWorlds.put(world, pvpWorld);
         }
 
         //sea level
         this.config_seaLevelOverride = new HashMap<String, Integer>();
-        for (int i = 0; i < worlds.size(); i++)
-        {
+        for (int i = 0; i < worlds.size(); i++) {
             int seaLevelOverride = config.getInt("GriefPrevention.SeaLevelOverrides." + worlds.get(i).getName(), -1);
             outConfig.set("GriefPrevention.SeaLevelOverrides." + worlds.get(i).getName(), seaLevelOverride);
             this.config_seaLevelOverride.put(worlds.get(i).getName(), seaLevelOverride);
@@ -636,12 +622,14 @@ public class EterniaKamui extends JavaPlugin
         this.config_blockSurfaceOtherExplosions = config.getBoolean("GriefPrevention.BlockSurfaceOtherExplosions", true);
         this.config_blockSkyTrees = config.getBoolean("GriefPrevention.LimitSkyTrees", true);
         this.config_limitTreeGrowth = config.getBoolean("GriefPrevention.LimitTreeGrowth", false);
-        this.config_checkPistonMovement = config.getBoolean("GriefPrevention.CheckPistonMovement", true);
-        this.config_pistonsInClaimsOnly = config.getBoolean("GriefPrevention.LimitPistonsToLandClaims", true);
-        if (!this.config_checkPistonMovement && this.config_pistonsInClaimsOnly) {
-            AddLogEntry("Error: You have enabled LimitPistonsToLandClaims, but CheckPistonMovement is off!");
-            this.config_pistonsInClaimsOnly = false;
+        this.config_pistonMovement = PistonMode.of(config.getString("GriefPrevention.PistonMovement", "CLAIMS_ONLY"));
+        if (config.isBoolean("GriefPrevention.LimitPistonsToLandClaims") && !config.isBoolean("GriefPrevention.LimitPistonsToLandClaims")) {
+            this.config_pistonMovement = PistonMode.EVERYWHERE_SIMPLE;
         }
+        if (config.isBoolean("GriefPrevention.CheckPistonMovement") && !config.getBoolean("GriefPrevention.CheckPistonMovement")) {
+            this.config_pistonMovement = PistonMode.IGNORED;
+        }
+
 
         this.config_fireSpreads = config.getBoolean("GriefPrevention.FireSpreads", false);
         this.config_fireDestroys = config.getBoolean("GriefPrevention.FireDestroys", false);
@@ -671,8 +659,7 @@ public class EterniaKamui extends JavaPlugin
 
         //validate investigation tool
         this.config_claims_investigationTool = Material.getMaterial(investigationToolMaterialName);
-        if (this.config_claims_investigationTool == null)
-        {
+        if (this.config_claims_investigationTool == null) {
             EterniaKamui.AddLogEntry("ERROR: Material " + investigationToolMaterialName + " not found.  Defaulting to the stick.  Please update your config.yml.");
             this.config_claims_investigationTool = Material.STICK;
         }
@@ -685,8 +672,7 @@ public class EterniaKamui extends JavaPlugin
 
         //validate modification tool
         this.config_claims_modificationTool = Material.getMaterial(modificationToolMaterialName);
-        if (this.config_claims_modificationTool == null)
-        {
+        if (this.config_claims_modificationTool == null) {
             EterniaKamui.AddLogEntry("ERROR: Material " + modificationToolMaterialName + " not found.  Defaulting to the golden shovel.  Please update your config.yml.");
             this.config_claims_modificationTool = Material.GOLDEN_SHOVEL;
         }
@@ -696,23 +682,18 @@ public class EterniaKamui extends JavaPlugin
 
         //get siege world names from the config file
         List<String> siegeEnabledWorldNames = config.getStringList("GriefPrevention.Siege.Worlds");
-        if (siegeEnabledWorldNames == null)
-        {
+        if (siegeEnabledWorldNames == null) {
             siegeEnabledWorldNames = defaultSiegeWorldNames;
         }
 
         //validate that list
         this.config_siege_enabledWorlds = new ArrayList<World>();
-        for (int i = 0; i < siegeEnabledWorldNames.size(); i++)
-        {
+        for (int i = 0; i < siegeEnabledWorldNames.size(); i++) {
             String worldName = siegeEnabledWorldNames.get(i);
             World world = this.getServer().getWorld(worldName);
-            if (world == null)
-            {
+            if (world == null) {
                 AddLogEntry("Error: Siege Configuration: There's no world named \"" + worldName + "\".  Please update your config.yml.");
-            }
-            else
-            {
+            } else {
                 this.config_siege_enabledWorlds.add(world);
             }
         }
@@ -755,8 +736,7 @@ public class EterniaKamui extends JavaPlugin
 
         //build a default config entry
         ArrayList<String> defaultBreakableBlocksList = new ArrayList<String>();
-        for (int i = 0; i < this.config_siege_blocks.size(); i++)
-        {
+        for (int i = 0; i < this.config_siege_blocks.size(); i++) {
             defaultBreakableBlocksList.add(this.config_siege_blocks.get(i).name());
         }
 
@@ -764,23 +744,18 @@ public class EterniaKamui extends JavaPlugin
         List<String> breakableBlocksList = config.getStringList("GriefPrevention.Siege.BreakableBlocks");
 
         //if it fails, use default list instead
-        if (breakableBlocksList == null || breakableBlocksList.size() == 0)
-        {
+        if (breakableBlocksList == null || breakableBlocksList.size() == 0) {
             breakableBlocksList = defaultBreakableBlocksList;
         }
 
         //parse the list of siege-breakable blocks
         this.config_siege_blocks = new ArrayList<Material>();
-        for (int i = 0; i < breakableBlocksList.size(); i++)
-        {
+        for (int i = 0; i < breakableBlocksList.size(); i++) {
             String blockName = breakableBlocksList.get(i);
             Material material = Material.getMaterial(blockName);
-            if (material == null)
-            {
+            if (material == null) {
                 EterniaKamui.AddLogEntry("Siege Configuration: Material not found: " + blockName + ".");
-            }
-            else
-            {
+            } else {
                 this.config_siege_blocks.add(material);
             }
         }
@@ -814,8 +789,7 @@ public class EterniaKamui extends JavaPlugin
         this.config_logs_mutedChatEnabled = config.getBoolean("GriefPrevention.Abridged Logs.Included Entry Types.Muted Chat Messages", false);
 
         //claims mode by world
-        for (World world : this.config_claims_worldModes.keySet())
-        {
+        for (World world : this.config_claims_worldModes.keySet()) {
             outConfig.set(
                     "GriefPrevention.Claims.Mode." + world.getName(),
                     this.config_claims_worldModes.get(world).name());
@@ -878,8 +852,7 @@ public class EterniaKamui extends JavaPlugin
         outConfig.set("GriefPrevention.Spam.DeathMessageCooldownSeconds", this.config_spam_deathMessageCooldownSeconds);
         outConfig.set("GriefPrevention.Spam.Logout Message Delay In Seconds", this.config_spam_logoutMessageDelaySeconds);
 
-        for (World world : worlds)
-        {
+        for (World world : worlds) {
             outConfig.set("GriefPrevention.PvP.RulesEnabledInWorld." + world.getName(), this.pvpRulesApply(world));
         }
         outConfig.set("GriefPrevention.PvP.ProtectFreshSpawns", this.config_pvp_protectFreshSpawns);
@@ -908,8 +881,9 @@ public class EterniaKamui extends JavaPlugin
         outConfig.set("GriefPrevention.BlockSurfaceOtherExplosions", this.config_blockSurfaceOtherExplosions);
         outConfig.set("GriefPrevention.LimitSkyTrees", this.config_blockSkyTrees);
         outConfig.set("GriefPrevention.LimitTreeGrowth", this.config_limitTreeGrowth);
-        outConfig.set("GriefPrevention.CheckPistonMovement", this.config_checkPistonMovement);
-        outConfig.set("GriefPrevention.LimitPistonsToLandClaims", this.config_pistonsInClaimsOnly);
+        outConfig.set("GriefPrevention.PistonMovement", this.config_pistonMovement.name());
+        outConfig.set("GriefPrevention.CheckPistonMovement", null);
+        outConfig.set("GriefPrevention.LimitPistonsToLandClaims", null);
 
         outConfig.set("GriefPrevention.FireSpreads", this.config_fireSpreads);
         outConfig.set("GriefPrevention.FireDestroys", this.config_fireDestroys);
@@ -950,22 +924,17 @@ public class EterniaKamui extends JavaPlugin
         outConfig.set("GriefPrevention.Abridged Logs.Included Entry Types.Debug", this.config_logs_debugEnabled);
         outConfig.set("GriefPrevention.Abridged Logs.Included Entry Types.Muted Chat Messages", this.config_logs_mutedChatEnabled);
 
-        try
-        {
+        try {
             outConfig.save(DataStore.configFilePath);
-        }
-        catch (IOException exception)
-        {
+        } catch (IOException exception) {
             AddLogEntry("Unable to write to the configuration file at \"" + DataStore.configFilePath + "\"");
         }
 
         //try to parse the list of commands requiring access trust in land claims
         this.config_claims_commandsRequiringAccessTrust = new ArrayList<String>();
         String[] commands = accessTrustSlashCommands.split(";");
-        for (int i = 0; i < commands.length; i++)
-        {
-            if (!commands[i].isEmpty())
-            {
+        for (int i = 0; i < commands.length; i++) {
+            if (!commands[i].isEmpty()) {
                 this.config_claims_commandsRequiringAccessTrust.add(commands[i].trim().toLowerCase());
             }
         }
@@ -973,67 +942,50 @@ public class EterniaKamui extends JavaPlugin
         //try to parse the list of commands which should be monitored for spam
         this.config_spam_monitorSlashCommands = new ArrayList<String>();
         commands = slashCommandsToMonitor.split(";");
-        for (int i = 0; i < commands.length; i++)
-        {
+        for (int i = 0; i < commands.length; i++) {
             this.config_spam_monitorSlashCommands.add(commands[i].trim().toLowerCase());
         }
 
         //try to parse the list of commands which should be included in eavesdropping
         this.config_eavesdrop_whisperCommands = new ArrayList<String>();
         commands = whisperCommandsToMonitor.split(";");
-        for (int i = 0; i < commands.length; i++)
-        {
+        for (int i = 0; i < commands.length; i++) {
             this.config_eavesdrop_whisperCommands.add(commands[i].trim().toLowerCase());
         }
 
         //try to parse the list of commands which should be banned during pvp combat
         this.config_pvp_blockedCommands = new ArrayList<String>();
         commands = bannedPvPCommandsList.split(";");
-        for (int i = 0; i < commands.length; i++)
-        {
+        for (int i = 0; i < commands.length; i++) {
             this.config_pvp_blockedCommands.add(commands[i].trim().toLowerCase());
         }
     }
 
-    private ClaimsMode configStringToClaimsMode(String configSetting)
-    {
-        if (configSetting.equalsIgnoreCase("Survival"))
-        {
+    private ClaimsMode configStringToClaimsMode(String configSetting) {
+        if (configSetting.equalsIgnoreCase("Survival")) {
             return ClaimsMode.Survival;
-        }
-        else if (configSetting.equalsIgnoreCase("Creative"))
-        {
+        } else if (configSetting.equalsIgnoreCase("Creative")) {
             return ClaimsMode.Creative;
-        }
-        else if (configSetting.equalsIgnoreCase("Disabled"))
-        {
+        } else if (configSetting.equalsIgnoreCase("Disabled")) {
             return ClaimsMode.Disabled;
-        }
-        else if (configSetting.equalsIgnoreCase("SurvivalRequiringClaims"))
-        {
+        } else if (configSetting.equalsIgnoreCase("SurvivalRequiringClaims")) {
             return ClaimsMode.SurvivalRequiringClaims;
-        }
-        else
-        {
+        } else {
             return null;
         }
     }
 
     //handles slash commands
-    public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args)
-    {
+    public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args) {
 
         Player player = null;
-        if (sender instanceof Player)
-        {
+        if (sender instanceof Player) {
             player = (Player) sender;
         }
 
         //claim
-        if (cmd.getName().equalsIgnoreCase("claim") && player != null)
-        {
-            if (!EterniaKamui.instance.claimsEnabledForWorld(player.getWorld()))
-            {
+        if (cmd.getName().equalsIgnoreCase("claim") && player != null) {
+            if (!EterniaKamui.instance.claimsEnabledForWorld(player.getWorld())) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.ClaimsDisabledWorld);
                 return true;
             }
@@ -1043,8 +995,7 @@ public class EterniaKamui extends JavaPlugin
             //if he's at the claim count per player limit already and doesn't have permission to bypass, display an error message
             if (EterniaKamui.instance.config_claims_maxClaimsPerPlayer > 0 &&
                     !player.hasPermission("griefprevention.overrideclaimcountlimit") &&
-                    playerData.getClaims().size() >= EterniaKamui.instance.config_claims_maxClaimsPerPlayer)
-            {
+                    playerData.getClaims().size() >= EterniaKamui.instance.config_claims_maxClaimsPerPlayer) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.ClaimCreationFailedOverClaimCountLimit);
                 return true;
             }
@@ -1054,11 +1005,9 @@ public class EterniaKamui extends JavaPlugin
             if (radius < 0) radius = (int) Math.ceil(Math.sqrt(EterniaKamui.instance.config_claims_minArea) / 2);
 
             //if player has any claims, respect claim minimum size setting
-            if (playerData.getClaims().size() > 0)
-            {
+            if (playerData.getClaims().size() > 0) {
                 //if player has exactly one land claim, this requires the claim modification tool to be in hand (or creative mode player)
-                if (playerData.getClaims().size() == 1 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool)
-                {
+                if (playerData.getClaims().size() == 1 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool) {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
                     return true;
                 }
@@ -1067,31 +1016,23 @@ public class EterniaKamui extends JavaPlugin
             }
 
             //allow for specifying the radius
-            if (args.length > 0)
-            {
-                if (playerData.getClaims().size() < 2 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool)
-                {
+            if (args.length > 0) {
+                if (playerData.getClaims().size() < 2 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool) {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.RadiusRequiresGoldenShovel);
                     return true;
                 }
 
                 int specifiedRadius;
-                try
-                {
+                try {
                     specifiedRadius = Integer.parseInt(args[0]);
-                }
-                catch (NumberFormatException e)
-                {
+                } catch (NumberFormatException e) {
                     return false;
                 }
 
-                if (specifiedRadius < radius)
-                {
+                if (specifiedRadius < radius) {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.MinimumRadius, String.valueOf(radius));
                     return true;
-                }
-                else
-                {
+                } else {
                     radius = specifiedRadius;
                 }
             }
@@ -1104,8 +1045,7 @@ public class EterniaKamui extends JavaPlugin
             //player must have sufficient unused claim blocks
             int area = Math.abs((gc.getBlockX() - lc.getBlockX() + 1) * (gc.getBlockZ() - lc.getBlockZ() + 1));
             int remaining = playerData.getRemainingClaimBlocks();
-            if (remaining < area)
-            {
+            if (remaining < area) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.CreateClaimInsufficientBlocks, String.valueOf(area - remaining));
                 EterniaKamui.instance.dataStore.tryAdvertiseAdminAlternatives(player);
                 return true;
@@ -1117,31 +1057,22 @@ public class EterniaKamui extends JavaPlugin
                     gc.getWorld().getHighestBlockYAt(gc) - EterniaKamui.instance.config_claims_claimsExtendIntoGroundDistance - 1,
                     lc.getBlockZ(), gc.getBlockZ(),
                     player.getUniqueId(), null, null, player);
-            if (!result.succeeded)
-            {
-                if (result.claim != null)
-                {
+            if (!result.succeeded) {
+                if (result.claim != null) {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapShort);
 
                     Visualization visualization = Visualization.FromClaim(result.claim, player.getEyeLocation().getBlockY(), VisualizationType.ErrorClaim, player.getLocation());
                     Visualization.Apply(player, visualization);
-                }
-                else
-                {
+                } else {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.CreateClaimFailOverlapRegion);
                 }
-            }
-            else
-            {
+            } else {
                 EterniaKamui.sendMessage(player, TextMode.Success, Messages.CreateClaimSuccess);
 
                 //link to a video demo of land claiming, based on world type
-                if (EterniaKamui.instance.creativeRulesApply(player.getLocation()))
-                {
+                if (EterniaKamui.instance.creativeRulesApply(player.getLocation())) {
                     EterniaKamui.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
-                }
-                else if (EterniaKamui.instance.claimsEnabledForWorld(player.getLocation().getWorld()))
-                {
+                } else if (EterniaKamui.instance.claimsEnabledForWorld(player.getLocation().getWorld())) {
                     EterniaKamui.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
                 }
                 Visualization visualization = Visualization.FromClaim(result.claim, player.getEyeLocation().getBlockY(), VisualizationType.Claim, player.getLocation());
@@ -1156,44 +1087,32 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //extendclaim
-        if (cmd.getName().equalsIgnoreCase("extendclaim") && player != null)
-        {
-            if (args.length < 1)
-            {
+        if (cmd.getName().equalsIgnoreCase("extendclaim") && player != null) {
+            if (args.length < 1) {
                 //link to a video demo of land claiming, based on world type
-                if (EterniaKamui.instance.creativeRulesApply(player.getLocation()))
-                {
+                if (EterniaKamui.instance.creativeRulesApply(player.getLocation())) {
                     EterniaKamui.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
-                }
-                else if (EterniaKamui.instance.claimsEnabledForWorld(player.getLocation().getWorld()))
-                {
+                } else if (EterniaKamui.instance.claimsEnabledForWorld(player.getLocation().getWorld())) {
                     EterniaKamui.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
                 }
                 return false;
             }
 
             int amount;
-            try
-            {
+            try {
                 amount = Integer.parseInt(args[0]);
-            }
-            catch (NumberFormatException e)
-            {
+            } catch (NumberFormatException e) {
                 //link to a video demo of land claiming, based on world type
-                if (EterniaKamui.instance.creativeRulesApply(player.getLocation()))
-                {
+                if (EterniaKamui.instance.creativeRulesApply(player.getLocation())) {
                     EterniaKamui.sendMessage(player, TextMode.Instr, Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
-                }
-                else if (EterniaKamui.instance.claimsEnabledForWorld(player.getLocation().getWorld()))
-                {
+                } else if (EterniaKamui.instance.claimsEnabledForWorld(player.getLocation().getWorld())) {
                     EterniaKamui.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
                 }
                 return false;
             }
 
             //requires claim modification tool in hand
-            if (player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool)
-            {
+            if (player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
                 return true;
             }
@@ -1201,30 +1120,26 @@ public class EterniaKamui extends JavaPlugin
             //must be standing in a land claim
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, playerData.lastClaim);
-            if (claim == null)
-            {
+            if (claim == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.StandInClaimToResize);
                 return true;
             }
 
             //must have permission to edit the land claim you're in
             String errorMessage = claim.allowEdit(player);
-            if (errorMessage != null)
-            {
+            if (errorMessage != null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotYourClaim);
                 return true;
             }
 
             //determine new corner coordinates
             org.bukkit.util.Vector direction = player.getLocation().getDirection();
-            if (direction.getY() > .75)
-            {
+            if (direction.getY() > .75) {
                 EterniaKamui.sendMessage(player, TextMode.Info, Messages.ClaimsExtendToSky);
                 return true;
             }
 
-            if (direction.getY() < -.75)
-            {
+            if (direction.getY() < -.75) {
                 EterniaKamui.sendMessage(player, TextMode.Info, Messages.ClaimsAutoExtendDownward);
                 return true;
             }
@@ -1239,49 +1154,34 @@ public class EterniaKamui extends JavaPlugin
             int newz2 = gc.getBlockZ();
 
             //if changing Z only
-            if (Math.abs(direction.getX()) < .3)
-            {
-                if (direction.getZ() > 0)
-                {
+            if (Math.abs(direction.getX()) < .3) {
+                if (direction.getZ() > 0) {
                     newz2 += amount;  //north
-                }
-                else
-                {
+                } else {
                     newz1 -= amount;  //south
                 }
             }
 
             //if changing X only
-            else if (Math.abs(direction.getZ()) < .3)
-            {
-                if (direction.getX() > 0)
-                {
+            else if (Math.abs(direction.getZ()) < .3) {
+                if (direction.getX() > 0) {
                     newx2 += amount;  //east
-                }
-                else
-                {
+                } else {
                     newx1 -= amount;  //west
                 }
             }
 
             //diagonals
-            else
-            {
-                if (direction.getX() > 0)
-                {
+            else {
+                if (direction.getX() > 0) {
                     newx2 += amount;
-                }
-                else
-                {
+                } else {
                     newx1 -= amount;
                 }
 
-                if (direction.getZ() > 0)
-                {
+                if (direction.getZ() > 0) {
                     newz2 += amount;
-                }
-                else
-                {
+                } else {
                     newz1 -= amount;
                 }
             }
@@ -1295,31 +1195,25 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //abandonclaim
-        if (cmd.getName().equalsIgnoreCase("abandonclaim") && player != null)
-        {
+        if (cmd.getName().equalsIgnoreCase("abandonclaim") && player != null) {
             return this.abandonClaimHandler(player, false);
         }
 
         //abandontoplevelclaim
-        if (cmd.getName().equalsIgnoreCase("abandontoplevelclaim") && player != null)
-        {
+        if (cmd.getName().equalsIgnoreCase("abandontoplevelclaim") && player != null) {
             return this.abandonClaimHandler(player, true);
         }
 
         //ignoreclaims
-        if (cmd.getName().equalsIgnoreCase("ignoreclaims") && player != null)
-        {
+        if (cmd.getName().equalsIgnoreCase("ignoreclaims") && player != null) {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
             playerData.ignoreClaims = !playerData.ignoreClaims;
 
             //toggle ignore claims mode on or off
-            if (!playerData.ignoreClaims)
-            {
+            if (!playerData.ignoreClaims) {
                 EterniaKamui.sendMessage(player, TextMode.Success, Messages.RespectingClaims);
-            }
-            else
-            {
+            } else {
                 EterniaKamui.sendMessage(player, TextMode.Success, Messages.IgnoringClaims);
             }
 
@@ -1327,12 +1221,10 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //abandonallclaims
-        else if (cmd.getName().equalsIgnoreCase("abandonallclaims") && player != null)
-        {
-            if (args.length != 1) return false;
+        else if (cmd.getName().equalsIgnoreCase("abandonallclaims") && player != null) {
+            if (args.length > 1) return false;
 
-            if (!"confirm".equalsIgnoreCase(args[0]))
-            {
+            if (args.length != 1 || !"confirm".equalsIgnoreCase(args[0])) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.ConfirmAbandonAllClaims);
                 return true;
             }
@@ -1342,17 +1234,14 @@ public class EterniaKamui extends JavaPlugin
             int originalClaimCount = playerData.getClaims().size();
 
             //check count
-            if (originalClaimCount == 0)
-            {
+            if (originalClaimCount == 0) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.YouHaveNoClaims);
                 return true;
             }
 
-            if (this.config_claims_abandonReturnRatio != 1.0D)
-            {
+            if (this.config_claims_abandonReturnRatio != 1.0D) {
                 //adjust claim blocks
-                for (Claim claim : playerData.getClaims())
-                {
+                for (Claim claim : playerData.getClaims()) {
                     playerData.setAccruedClaimBlocks(playerData.getAccruedClaimBlocks() - (int) Math.ceil((claim.getArea() * (1 - this.config_claims_abandonReturnRatio))));
                 }
             }
@@ -1372,8 +1261,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //restore nature
-        else if (cmd.getName().equalsIgnoreCase("restorenature") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("restorenature") && player != null) {
             //change shovel mode
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.RestoreNature;
@@ -1382,8 +1270,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //restore nature aggressive mode
-        else if (cmd.getName().equalsIgnoreCase("restorenatureaggressive") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("restorenatureaggressive") && player != null) {
             //change shovel mode
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.RestoreNatureAggressive;
@@ -1392,21 +1279,18 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //restore nature fill mode
-        else if (cmd.getName().equalsIgnoreCase("restorenaturefill") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("restorenaturefill") && player != null) {
             //change shovel mode
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.RestoreNatureFill;
 
             //set radius based on arguments
             playerData.fillRadius = 2;
-            if (args.length > 0)
-            {
-                try
-                {
+            if (args.length > 0) {
+                try {
                     playerData.fillRadius = Integer.parseInt(args[0]);
+                } catch (Exception exception) {
                 }
-                catch (Exception exception) { }
             }
 
             if (playerData.fillRadius < 0) playerData.fillRadius = 2;
@@ -1416,8 +1300,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //trust <player>
-        else if (cmd.getName().equalsIgnoreCase("trust") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("trust") && player != null) {
             //requires exactly one parameter, the other player's name
             if (args.length != 1) return false;
 
@@ -1428,19 +1311,16 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //transferclaim <player>
-        else if (cmd.getName().equalsIgnoreCase("transferclaim") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("transferclaim") && player != null) {
             //which claim is the user in?
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, null);
-            if (claim == null)
-            {
+            if (claim == null) {
                 EterniaKamui.sendMessage(player, TextMode.Instr, Messages.TransferClaimMissing);
                 return true;
             }
 
             //check additional permission for admin claims
-            if (claim.isAdminClaim() && !player.hasPermission("griefprevention.adminclaims"))
-            {
+            if (claim.isAdminClaim() && !player.hasPermission("griefprevention.adminclaims")) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.TransferClaimPermission);
                 return true;
             }
@@ -1448,11 +1328,9 @@ public class EterniaKamui extends JavaPlugin
             UUID newOwnerID = null;  //no argument = make an admin claim
             String ownerName = "admin";
 
-            if (args.length > 0)
-            {
+            if (args.length > 0) {
                 OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
-                if (targetPlayer == null)
-                {
+                if (targetPlayer == null) {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                     return true;
                 }
@@ -1461,12 +1339,9 @@ public class EterniaKamui extends JavaPlugin
             }
 
             //change ownerhsip
-            try
-            {
+            try {
                 this.dataStore.changeClaimOwner(claim, newOwnerID);
-            }
-            catch (NoTransferException e)
-            {
+            } catch (NoTransferException e) {
                 EterniaKamui.sendMessage(player, TextMode.Instr, Messages.TransferTopLevel);
                 return true;
             }
@@ -1479,21 +1354,18 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //trustlist
-        else if (cmd.getName().equalsIgnoreCase("trustlist") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("trustlist") && player != null) {
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, null);
 
             //if no claim here, error message
-            if (claim == null)
-            {
+            if (claim == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.TrustListNoClaim);
                 return true;
             }
 
             //if no permission to manage permissions, error message
             String errorMessage = claim.allowGrantPermission(player);
-            if (errorMessage != null)
-            {
+            if (errorMessage != null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, errorMessage);
                 return true;
             }
@@ -1511,8 +1383,7 @@ public class EterniaKamui extends JavaPlugin
             StringBuilder permissions = new StringBuilder();
             permissions.append(ChatColor.GOLD + ">");
 
-            if (managers.size() > 0)
-            {
+            if (managers.size() > 0) {
                 for (int i = 0; i < managers.size(); i++)
                     permissions.append(this.trustEntryToPlayerName(managers.get(i)) + " ");
             }
@@ -1521,8 +1392,7 @@ public class EterniaKamui extends JavaPlugin
             permissions = new StringBuilder();
             permissions.append(ChatColor.YELLOW + ">");
 
-            if (builders.size() > 0)
-            {
+            if (builders.size() > 0) {
                 for (int i = 0; i < builders.size(); i++)
                     permissions.append(this.trustEntryToPlayerName(builders.get(i)) + " ");
             }
@@ -1531,8 +1401,7 @@ public class EterniaKamui extends JavaPlugin
             permissions = new StringBuilder();
             permissions.append(ChatColor.GREEN + ">");
 
-            if (containers.size() > 0)
-            {
+            if (containers.size() > 0) {
                 for (int i = 0; i < containers.size(); i++)
                     permissions.append(this.trustEntryToPlayerName(containers.get(i)) + " ");
             }
@@ -1541,8 +1410,7 @@ public class EterniaKamui extends JavaPlugin
             permissions = new StringBuilder();
             permissions.append(ChatColor.BLUE + ">");
 
-            if (accessors.size() > 0)
-            {
+            if (accessors.size() > 0) {
                 for (int i = 0; i < accessors.size(); i++)
                     permissions.append(this.trustEntryToPlayerName(accessors.get(i)) + " ");
             }
@@ -1555,8 +1423,7 @@ public class EterniaKamui extends JavaPlugin
                             ChatColor.GREEN + this.dataStore.getMessage(Messages.Containers) + " " +
                             ChatColor.BLUE + this.dataStore.getMessage(Messages.Access));
 
-            if (claim.getSubclaimRestrictions())
-            {
+            if (claim.getSubclaimRestrictions()) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.HasSubclaimRestriction);
             }
 
@@ -1564,8 +1431,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //untrust <player> or untrust [<group>]
-        else if (cmd.getName().equalsIgnoreCase("untrust") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("untrust") && player != null) {
             //requires exactly one parameter, the other player's name
             if (args.length != 1) return false;
 
@@ -1573,34 +1439,25 @@ public class EterniaKamui extends JavaPlugin
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), true /*ignore height*/, null);
 
             //bracket any permissions
-            if (args[0].contains(".") && !args[0].startsWith("[") && !args[0].endsWith("]"))
-            {
+            if (args[0].contains(".") && !args[0].startsWith("[") && !args[0].endsWith("]")) {
                 args[0] = "[" + args[0] + "]";
             }
 
             //determine whether a single player or clearing permissions entirely
             boolean clearPermissions = false;
             OfflinePlayer otherPlayer = null;
-            if (args[0].equals("all"))
-            {
-                if (claim == null || claim.allowEdit(player) == null)
-                {
+            if (args[0].equals("all")) {
+                if (claim == null || claim.allowEdit(player) == null) {
                     clearPermissions = true;
-                }
-                else
-                {
+                } else {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.ClearPermsOwnerOnly);
                     return true;
                 }
-            }
-            else
-            {
+            } else {
                 //validate player argument or group argument
-                if (!args[0].startsWith("[") || !args[0].endsWith("]"))
-                {
+                if (!args[0].startsWith("[") || !args[0].endsWith("]")) {
                     otherPlayer = this.resolvePlayerByName(args[0]);
-                    if (!clearPermissions && otherPlayer == null && !args[0].equals("public"))
-                    {
+                    if (!clearPermissions && otherPlayer == null && !args[0].equals("public")) {
                         EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                         return true;
                     }
@@ -1612,13 +1469,11 @@ public class EterniaKamui extends JavaPlugin
             }
 
             //if no claim here, apply changes to all his claims
-            if (claim == null)
-            {
+            if (claim == null) {
                 PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
                 String idToDrop = args[0];
-                if (otherPlayer != null)
-                {
+                if (otherPlayer != null) {
                     idToDrop = otherPlayer.getUniqueId().toString();
                 }
 
@@ -1626,25 +1481,21 @@ public class EterniaKamui extends JavaPlugin
                 TrustChangedEvent event = new TrustChangedEvent(player, playerData.getClaims(), null, false, idToDrop);
                 Bukkit.getPluginManager().callEvent(event);
 
-                if (event.isCancelled())
-                {
+                if (event.isCancelled()) {
                     return true;
                 }
 
                 //dropping permissions
-                for (int i = 0; i < playerData.getClaims().size(); i++)
-                {
+                for (int i = 0; i < playerData.getClaims().size(); i++) {
                     claim = playerData.getClaims().get(i);
 
                     //if untrusting "all" drop all permissions
-                    if (clearPermissions)
-                    {
+                    if (clearPermissions) {
                         claim.clearPermissions();
                     }
 
                     //otherwise drop individual permissions
-                    else
-                    {
+                    else {
                         claim.dropPermission(idToDrop);
                         claim.managers.remove(idToDrop);
                     }
@@ -1654,36 +1505,27 @@ public class EterniaKamui extends JavaPlugin
                 }
 
                 //beautify for output
-                if (args[0].equals("public"))
-                {
+                if (args[0].equals("public")) {
                     args[0] = "the public";
                 }
 
                 //confirmation message
-                if (!clearPermissions)
-                {
+                if (!clearPermissions) {
                     EterniaKamui.sendMessage(player, TextMode.Success, Messages.UntrustIndividualAllClaims, args[0]);
-                }
-                else
-                {
+                } else {
                     EterniaKamui.sendMessage(player, TextMode.Success, Messages.UntrustEveryoneAllClaims);
                 }
             }
 
             //otherwise, apply changes to only this claim
-            else if (claim.allowGrantPermission(player) != null)
-            {
+            else if (claim.allowGrantPermission(player) != null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoPermissionTrust, claim.getOwnerName());
                 return true;
-            }
-            else
-            {
+            } else {
                 //if clearing all
-                if (clearPermissions)
-                {
+                if (clearPermissions) {
                     //requires owner
-                    if (claim.allowEdit(player) != null)
-                    {
+                    if (claim.allowEdit(player) != null) {
                         EterniaKamui.sendMessage(player, TextMode.Err, Messages.UntrustAllOwnerOnly);
                         return true;
                     }
@@ -1692,8 +1534,7 @@ public class EterniaKamui extends JavaPlugin
                     TrustChangedEvent event = new TrustChangedEvent(player, claim, null, false, args[0]);
                     Bukkit.getPluginManager().callEvent(event);
 
-                    if (event.isCancelled())
-                    {
+                    if (event.isCancelled()) {
                         return true;
                     }
 
@@ -1702,11 +1543,9 @@ public class EterniaKamui extends JavaPlugin
                 }
 
                 //otherwise individual permission drop
-                else
-                {
+                else {
                     String idToDrop = args[0];
-                    if (otherPlayer != null)
-                    {
+                    if (otherPlayer != null) {
                         idToDrop = otherPlayer.getUniqueId().toString();
                     }
                     boolean targetIsManager = claim.managers.contains(idToDrop);
@@ -1714,15 +1553,12 @@ public class EterniaKamui extends JavaPlugin
                     {
                         EterniaKamui.sendMessage(player, TextMode.Err, Messages.ManagersDontUntrustManagers, claim.getOwnerName());
                         return true;
-                    }
-                    else
-                    {
+                    } else {
                         //calling the event
                         TrustChangedEvent event = new TrustChangedEvent(player, claim, null, false, idToDrop);
                         Bukkit.getPluginManager().callEvent(event);
 
-                        if (event.isCancelled())
-                        {
+                        if (event.isCancelled()) {
                             return true;
                         }
 
@@ -1730,8 +1566,7 @@ public class EterniaKamui extends JavaPlugin
                         claim.managers.remove(idToDrop);
 
                         //beautify for output
-                        if (args[0].equals("public"))
-                        {
+                        if (args[0].equals("public")) {
                             args[0] = "the public";
                         }
 
@@ -1747,8 +1582,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //accesstrust <player>
-        else if (cmd.getName().equalsIgnoreCase("accesstrust") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("accesstrust") && player != null) {
             //requires exactly one parameter, the other player's name
             if (args.length != 1) return false;
 
@@ -1758,8 +1592,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //containertrust <player>
-        else if (cmd.getName().equalsIgnoreCase("containertrust") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("containertrust") && player != null) {
             //requires exactly one parameter, the other player's name
             if (args.length != 1) return false;
 
@@ -1769,8 +1602,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //permissiontrust <player>
-        else if (cmd.getName().equalsIgnoreCase("permissiontrust") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("permissiontrust") && player != null) {
             //requires exactly one parameter, the other player's name
             if (args.length != 1) return false;
 
@@ -1780,12 +1612,10 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //restrictsubclaim
-        else if (cmd.getName().equalsIgnoreCase("restrictsubclaim") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("restrictsubclaim") && player != null) {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), true, playerData.lastClaim);
-            if (claim == null || claim.parent == null)
-            {
+            if (claim == null || claim.parent == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.StandInSubclaim);
                 return true;
             }
@@ -1793,19 +1623,15 @@ public class EterniaKamui extends JavaPlugin
             // If player has /ignoreclaims on, continue
             // If admin claim, fail if this user is not an admin
             // If not an admin claim, fail if this user is not the owner
-            if (!playerData.ignoreClaims && (claim.isAdminClaim() ? !player.hasPermission("griefprevention.adminclaims") : !player.getUniqueId().equals(claim.parent.ownerID)))
-            {
+            if (!playerData.ignoreClaims && (claim.isAdminClaim() ? !player.hasPermission("griefprevention.adminclaims") : !player.getUniqueId().equals(claim.parent.ownerID))) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.OnlyOwnersModifyClaims, claim.getOwnerName());
                 return true;
             }
 
-            if (claim.getSubclaimRestrictions())
-            {
+            if (claim.getSubclaimRestrictions()) {
                 claim.setSubclaimRestrictions(false);
                 EterniaKamui.sendMessage(player, TextMode.Success, Messages.SubclaimUnrestricted);
-            }
-            else
-            {
+            } else {
                 claim.setSubclaimRestrictions(true);
                 EterniaKamui.sendMessage(player, TextMode.Success, Messages.SubclaimRestricted);
             }
@@ -1814,71 +1640,57 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //buyclaimblocks
-        else if (cmd.getName().equalsIgnoreCase("buyclaimblocks") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("buyclaimblocks") && player != null) {
             //if economy is disabled, don't do anything
-            if (EterniaKamui.economy == null)
-            {
+            if (EterniaKamui.economy == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.BuySellNotConfigured);
                 return true;
             }
 
-            if (!player.hasPermission("griefprevention.buysellclaimblocks"))
-            {
+            if (!player.hasPermission("griefprevention.buysellclaimblocks")) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoPermissionForCommand);
                 return true;
             }
 
             //if purchase disabled, send error message
-            if (EterniaKamui.instance.config_economy_claimBlocksPurchaseCost == 0)
-            {
+            if (EterniaKamui.instance.config_economy_claimBlocksPurchaseCost == 0) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.OnlySellBlocks);
                 return true;
             }
 
             //if no parameter, just tell player cost per block and balance
-            if (args.length != 1)
-            {
+            if (args.length != 1) {
                 EterniaKamui.sendMessage(player, TextMode.Info, Messages.BlockPurchaseCost, String.valueOf(EterniaKamui.instance.config_economy_claimBlocksPurchaseCost), String.valueOf(EterniaKamui.economy.getBalance(player.getName())));
                 return false;
-            }
-            else
-            {
+            } else {
                 PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
                 //try to parse number of blocks
                 int blockCount;
-                try
-                {
+                try {
                     blockCount = Integer.parseInt(args[0]);
-                }
-                catch (NumberFormatException numberFormatException)
-                {
+                } catch (NumberFormatException numberFormatException) {
                     return false;  //causes usage to be displayed
                 }
 
-                if (blockCount <= 0)
-                {
+                if (blockCount <= 0) {
                     return false;
                 }
 
                 //if the player can't afford his purchase, send error message
                 double balance = economy.getBalance(player.getName());
                 double totalCost = blockCount * EterniaKamui.instance.config_economy_claimBlocksPurchaseCost;
-                if (totalCost > balance)
-                {
+                if (totalCost > balance) {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.InsufficientFunds, String.valueOf(totalCost), String.valueOf(balance));
                 }
 
                 //otherwise carry out transaction
-                else
-                {
+                else {
                     int newBonusClaimBlocks = playerData.getBonusClaimBlocks() + blockCount;
 
                     //if the player is going to reach max bonus limit, send error message
                     int bonusBlocksLimit = EterniaKamui.instance.config_economy_claimBlocksMaxBonus;
-                    if (bonusBlocksLimit != 0 && newBonusClaimBlocks > bonusBlocksLimit)
-                    {
+                    if (bonusBlocksLimit != 0 && newBonusClaimBlocks > bonusBlocksLimit) {
                         EterniaKamui.sendMessage(player, TextMode.Err, Messages.MaxBonusReached, String.valueOf(blockCount), String.valueOf(bonusBlocksLimit));
                         return true;
                     }
@@ -1899,24 +1711,20 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //sellclaimblocks <amount>
-        else if (cmd.getName().equalsIgnoreCase("sellclaimblocks") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("sellclaimblocks") && player != null) {
             //if economy is disabled, don't do anything
-            if (EterniaKamui.economy == null)
-            {
+            if (EterniaKamui.economy == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.BuySellNotConfigured);
                 return true;
             }
 
-            if (!player.hasPermission("griefprevention.buysellclaimblocks"))
-            {
+            if (!player.hasPermission("griefprevention.buysellclaimblocks")) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoPermissionForCommand);
                 return true;
             }
 
             //if disabled, error message
-            if (EterniaKamui.instance.config_economy_claimBlocksSellValue == 0)
-            {
+            if (EterniaKamui.instance.config_economy_claimBlocksSellValue == 0) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.OnlyPurchaseBlocks);
                 return true;
             }
@@ -1926,37 +1734,30 @@ public class EterniaKamui extends JavaPlugin
             int availableBlocks = playerData.getRemainingClaimBlocks();
 
             //if no amount provided, just tell player value per block sold, and how many he can sell
-            if (args.length != 1)
-            {
+            if (args.length != 1) {
                 EterniaKamui.sendMessage(player, TextMode.Info, Messages.BlockSaleValue, String.valueOf(EterniaKamui.instance.config_economy_claimBlocksSellValue), String.valueOf(availableBlocks));
                 return false;
             }
 
             //parse number of blocks
             int blockCount;
-            try
-            {
+            try {
                 blockCount = Integer.parseInt(args[0]);
-            }
-            catch (NumberFormatException numberFormatException)
-            {
+            } catch (NumberFormatException numberFormatException) {
                 return false;  //causes usage to be displayed
             }
 
-            if (blockCount <= 0)
-            {
+            if (blockCount <= 0) {
                 return false;
             }
 
             //if he doesn't have enough blocks, tell him so
-            if (blockCount > availableBlocks)
-            {
+            if (blockCount > availableBlocks) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotEnoughBlocksForSale);
             }
 
             //otherwise carry out the transaction
-            else
-            {
+            else {
                 //compute value and deposit it
                 double totalValue = blockCount * EterniaKamui.instance.config_economy_claimBlocksSellValue;
                 economy.depositPlayer(player.getName(), totalValue);
@@ -1973,8 +1774,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //adminclaims
-        else if (cmd.getName().equalsIgnoreCase("adminclaims") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("adminclaims") && player != null) {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.Admin;
             EterniaKamui.sendMessage(player, TextMode.Success, Messages.AdminClaimsMode);
@@ -1983,8 +1783,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //basicclaims
-        else if (cmd.getName().equalsIgnoreCase("basicclaims") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("basicclaims") && player != null) {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.Basic;
             playerData.claimSubdividing = null;
@@ -1994,8 +1793,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //subdivideclaims
-        else if (cmd.getName().equalsIgnoreCase("subdivideclaims") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("subdivideclaims") && player != null) {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.shovelMode = ShovelMode.Subdivide;
             playerData.claimSubdividing = null;
@@ -2006,34 +1804,25 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //deleteclaim
-        else if (cmd.getName().equalsIgnoreCase("deleteclaim") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("deleteclaim") && player != null) {
             //determine which claim the player is standing in
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), true /*ignore height*/, null);
 
-            if (claim == null)
-            {
+            if (claim == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.DeleteClaimMissing);
-            }
-            else
-            {
+            } else {
                 //deleting an admin claim additionally requires the adminclaims permission
-                if (!claim.isAdminClaim() || player.hasPermission("griefprevention.adminclaims"))
-                {
+                if (!claim.isAdminClaim() || player.hasPermission("griefprevention.adminclaims")) {
                     PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
-                    if (claim.children.size() > 0 && !playerData.warnedAboutMajorDeletion)
-                    {
+                    if (claim.children.size() > 0 && !playerData.warnedAboutMajorDeletion) {
                         EterniaKamui.sendMessage(player, TextMode.Warn, Messages.DeletionSubdivisionWarning);
                         playerData.warnedAboutMajorDeletion = true;
-                    }
-                    else
-                    {
+                    } else {
                         claim.removeSurfaceFluids(null);
                         this.dataStore.deleteClaim(claim, true, true);
 
                         //if in a creative mode world, /restorenature the claim
-                        if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()) || EterniaKamui.instance.config_claims_survivalAutoNatureRestoration)
-                        {
+                        if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()) || EterniaKamui.instance.config_claims_survivalAutoNatureRestoration) {
                             EterniaKamui.instance.restoreClaim(claim, 0);
                         }
 
@@ -2045,40 +1834,29 @@ public class EterniaKamui extends JavaPlugin
 
                         playerData.warnedAboutMajorDeletion = false;
                     }
-                }
-                else
-                {
+                } else {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.CantDeleteAdminClaim);
                 }
             }
 
             return true;
-        }
-        else if (cmd.getName().equalsIgnoreCase("claimexplosions") && player != null)
-        {
+        } else if (cmd.getName().equalsIgnoreCase("claimexplosions") && player != null) {
             //determine which claim the player is standing in
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), true /*ignore height*/, null);
 
-            if (claim == null)
-            {
+            if (claim == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.DeleteClaimMissing);
-            }
-            else
-            {
+            } else {
                 String noBuildReason = claim.allowBuild(player, Material.STONE);
-                if (noBuildReason != null)
-                {
+                if (noBuildReason != null) {
                     EterniaKamui.sendMessage(player, TextMode.Err, noBuildReason);
                     return true;
                 }
 
-                if (claim.areExplosivesAllowed)
-                {
+                if (claim.areExplosivesAllowed) {
                     claim.areExplosivesAllowed = false;
                     EterniaKamui.sendMessage(player, TextMode.Success, Messages.ExplosivesDisabled);
-                }
-                else
-                {
+                } else {
                     claim.areExplosivesAllowed = true;
                     EterniaKamui.sendMessage(player, TextMode.Success, Messages.ExplosivesEnabled);
                 }
@@ -2088,15 +1866,13 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //deleteallclaims <player>
-        else if (cmd.getName().equalsIgnoreCase("deleteallclaims"))
-        {
+        else if (cmd.getName().equalsIgnoreCase("deleteallclaims")) {
             //requires exactly one parameter, the other player's name
             if (args.length != 1) return false;
 
             //try to find that player
             OfflinePlayer otherPlayer = this.resolvePlayerByName(args[0]);
-            if (otherPlayer == null)
-            {
+            if (otherPlayer == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
@@ -2105,8 +1881,7 @@ public class EterniaKamui extends JavaPlugin
             this.dataStore.deleteClaimsForPlayer(otherPlayer.getUniqueId(), true);
 
             EterniaKamui.sendMessage(player, TextMode.Success, Messages.DeleteAllSuccess, otherPlayer.getName());
-            if (player != null)
-            {
+            if (player != null) {
                 EterniaKamui.AddLogEntry(player.getName() + " deleted all claims belonging to " + otherPlayer.getName() + ".", CustomLogEntryTypes.AdminActivity);
 
                 //revert any current visualization
@@ -2114,12 +1889,9 @@ public class EterniaKamui extends JavaPlugin
             }
 
             return true;
-        }
-        else if (cmd.getName().equalsIgnoreCase("deleteclaimsinworld"))
-        {
+        } else if (cmd.getName().equalsIgnoreCase("deleteclaimsinworld")) {
             //must be executed at the console
-            if (player != null)
-            {
+            if (player != null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.ConsoleOnlyCommand);
                 return true;
             }
@@ -2129,8 +1901,7 @@ public class EterniaKamui extends JavaPlugin
 
             //try to find the specified world
             World world = Bukkit.getServer().getWorld(args[0]);
-            if (world == null)
-            {
+            if (world == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.WorldNotFound);
                 return true;
             }
@@ -2139,12 +1910,9 @@ public class EterniaKamui extends JavaPlugin
             this.dataStore.deleteClaimsInWorld(world, true);
             EterniaKamui.AddLogEntry("Deleted all claims in world: " + world.getName() + ".", CustomLogEntryTypes.AdminActivity);
             return true;
-        }
-        else if (cmd.getName().equalsIgnoreCase("deleteuserclaimsinworld"))
-        {
+        } else if (cmd.getName().equalsIgnoreCase("deleteuserclaimsinworld")) {
             //must be executed at the console
-            if (player != null)
-            {
+            if (player != null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.ConsoleOnlyCommand);
                 return true;
             }
@@ -2154,8 +1922,7 @@ public class EterniaKamui extends JavaPlugin
 
             //try to find the specified world
             World world = Bukkit.getServer().getWorld(args[0]);
-            if (world == null)
-            {
+            if (world == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.WorldNotFound);
                 return true;
             }
@@ -2167,20 +1934,16 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //claimbook
-        else if (cmd.getName().equalsIgnoreCase("claimbook"))
-        {
+        else if (cmd.getName().equalsIgnoreCase("claimbook")) {
             //requires one parameter
             if (args.length != 1) return false;
 
             //try to find the specified player
             Player otherPlayer = this.getServer().getPlayer(args[0]);
-            if (otherPlayer == null)
-            {
+            if (otherPlayer == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
-            }
-            else
-            {
+            } else {
                 WelcomeTask task = new WelcomeTask(otherPlayer);
                 task.run();
                 return true;
@@ -2188,8 +1951,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //claimslist or claimslist <player>
-        else if (cmd.getName().equalsIgnoreCase("claimslist"))
-        {
+        else if (cmd.getName().equalsIgnoreCase("claimslist")) {
             //at most one parameter
             if (args.length > 1) return false;
 
@@ -2197,8 +1959,7 @@ public class EterniaKamui extends JavaPlugin
             OfflinePlayer otherPlayer;
 
             //if another player isn't specified, assume current player
-            if (args.length < 1)
-            {
+            if (args.length < 1) {
                 if (player != null)
                     otherPlayer = player;
                 else
@@ -2206,18 +1967,15 @@ public class EterniaKamui extends JavaPlugin
             }
 
             //otherwise if no permission to delve into another player's claims data
-            else if (player != null && !player.hasPermission("griefprevention.claimslistother"))
-            {
+            else if (player != null && !player.hasPermission("griefprevention.claimslistother")) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.ClaimsListNoPermission);
                 return true;
             }
 
             //otherwise try to find the specified player
-            else
-            {
+            else {
                 otherPlayer = this.resolvePlayerByName(args[0]);
-                if (otherPlayer == null)
-                {
+                if (otherPlayer == null) {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                     return true;
                 }
@@ -2230,11 +1988,9 @@ public class EterniaKamui extends JavaPlugin
                     String.valueOf(playerData.getAccruedClaimBlocks()),
                     String.valueOf((playerData.getBonusClaimBlocks() + this.dataStore.getGroupBonusBlocks(otherPlayer.getUniqueId()))),
                     String.valueOf((playerData.getAccruedClaimBlocks() + playerData.getBonusClaimBlocks() + this.dataStore.getGroupBonusBlocks(otherPlayer.getUniqueId()))));
-            if (claims.size() > 0)
-            {
+            if (claims.size() > 0) {
                 EterniaKamui.sendMessage(player, TextMode.Instr, Messages.ClaimsListHeader);
-                for (int i = 0; i < playerData.getClaims().size(); i++)
-                {
+                for (int i = 0; i < playerData.getClaims().size(); i++) {
                     Claim claim = playerData.getClaims().get(i);
                     EterniaKamui.sendMessage(player, TextMode.Instr, getfriendlyLocationString(claim.getLesserBoundaryCorner()) + this.dataStore.getMessage(Messages.ContinueBlockMath, String.valueOf(claim.getArea())));
                 }
@@ -2250,22 +2006,18 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //adminclaimslist
-        else if (cmd.getName().equalsIgnoreCase("adminclaimslist"))
-        {
+        else if (cmd.getName().equalsIgnoreCase("adminclaimslist")) {
             //find admin claims
             Vector<Claim> claims = new Vector<Claim>();
-            for (Claim claim : this.dataStore.claims)
-            {
+            for (Claim claim : this.dataStore.claims) {
                 if (claim.ownerID == null)  //admin claim
                 {
                     claims.add(claim);
                 }
             }
-            if (claims.size() > 0)
-            {
+            if (claims.size() > 0) {
                 EterniaKamui.sendMessage(player, TextMode.Instr, Messages.ClaimsListHeader);
-                for (int i = 0; i < claims.size(); i++)
-                {
+                for (int i = 0; i < claims.size(); i++) {
                     Claim claim = claims.get(i);
                     EterniaKamui.sendMessage(player, TextMode.Instr, getfriendlyLocationString(claim.getLesserBoundaryCorner()));
                 }
@@ -2275,24 +2027,19 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //unlockItems
-        else if (cmd.getName().equalsIgnoreCase("unlockdrops") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("unlockdrops") && player != null) {
             PlayerData playerData;
 
-            if (player.hasPermission("griefprevention.unlockothersdrops") && args.length == 1)
-            {
+            if (player.hasPermission("griefprevention.unlockothersdrops") && args.length == 1) {
                 Player otherPlayer = Bukkit.getPlayer(args[0]);
-                if (otherPlayer == null)
-                {
+                if (otherPlayer == null) {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                     return true;
                 }
 
                 playerData = this.dataStore.getPlayerData(otherPlayer.getUniqueId());
                 EterniaKamui.sendMessage(player, TextMode.Success, Messages.DropUnlockOthersConfirmation, otherPlayer.getName());
-            }
-            else
-            {
+            } else {
                 playerData = this.dataStore.getPlayerData(player.getUniqueId());
                 EterniaKamui.sendMessage(player, TextMode.Success, Messages.DropUnlockConfirmation);
             }
@@ -2303,10 +2050,8 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //deletealladminclaims
-        else if (player != null && cmd.getName().equalsIgnoreCase("deletealladminclaims"))
-        {
-            if (!player.hasPermission("griefprevention.deleteclaims"))
-            {
+        else if (player != null && cmd.getName().equalsIgnoreCase("deletealladminclaims")) {
+            if (!player.hasPermission("griefprevention.deleteclaims")) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoDeletePermission);
                 return true;
             }
@@ -2315,8 +2060,7 @@ public class EterniaKamui extends JavaPlugin
             this.dataStore.deleteClaimsForPlayer(null, true);  //null for owner id indicates an administrative claim
 
             EterniaKamui.sendMessage(player, TextMode.Success, Messages.AllAdminDeleted);
-            if (player != null)
-            {
+            if (player != null) {
                 EterniaKamui.AddLogEntry(player.getName() + " deleted all administrative claims.", CustomLogEntryTypes.AdminActivity);
 
                 //revert any current visualization
@@ -2327,25 +2071,20 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //adjustbonusclaimblocks <player> <amount> or [<permission>] amount
-        else if (cmd.getName().equalsIgnoreCase("adjustbonusclaimblocks"))
-        {
+        else if (cmd.getName().equalsIgnoreCase("adjustbonusclaimblocks")) {
             //requires exactly two parameters, the other player or group's name and the adjustment
             if (args.length != 2) return false;
 
             //parse the adjustment amount
             int adjustment;
-            try
-            {
+            try {
                 adjustment = Integer.parseInt(args[1]);
-            }
-            catch (NumberFormatException numberFormatException)
-            {
+            } catch (NumberFormatException numberFormatException) {
                 return false;  //causes usage to be displayed
             }
 
             //if granting blocks to all players with a specific permission
-            if (args[0].startsWith("[") && args[0].endsWith("]"))
-            {
+            if (args[0].startsWith("[") && args[0].endsWith("]")) {
                 String permissionIdentifier = args[0].substring(1, args[0].length() - 1);
                 int newTotal = this.dataStore.adjustGroupBonusBlocks(permissionIdentifier, adjustment);
 
@@ -2358,19 +2097,15 @@ public class EterniaKamui extends JavaPlugin
 
             //otherwise, find the specified player
             OfflinePlayer targetPlayer;
-            try
-            {
+            try {
                 UUID playerID = UUID.fromString(args[0]);
                 targetPlayer = this.getServer().getOfflinePlayer(playerID);
 
-            }
-            catch (IllegalArgumentException e)
-            {
+            } catch (IllegalArgumentException e) {
                 targetPlayer = this.resolvePlayerByName(args[0]);
             }
 
-            if (targetPlayer == null)
-            {
+            if (targetPlayer == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
@@ -2388,19 +2123,15 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //adjustbonusclaimblocksall <amount>
-        else if (cmd.getName().equalsIgnoreCase("adjustbonusclaimblocksall"))
-        {
+        else if (cmd.getName().equalsIgnoreCase("adjustbonusclaimblocksall")) {
             //requires exactly one parameter, the amount of adjustment
             if (args.length != 1) return false;
 
             //parse the adjustment amount
             int adjustment;
-            try
-            {
+            try {
                 adjustment = Integer.parseInt(args[0]);
-            }
-            catch (NumberFormatException numberFormatException)
-            {
+            } catch (NumberFormatException numberFormatException) {
                 return false;  //causes usage to be displayed
             }
 
@@ -2408,8 +2139,7 @@ public class EterniaKamui extends JavaPlugin
             @SuppressWarnings("unchecked")
             Collection<Player> players = (Collection<Player>) this.getServer().getOnlinePlayers();
             StringBuilder builder = new StringBuilder();
-            for (Player onlinePlayer : players)
-            {
+            for (Player onlinePlayer : players) {
                 UUID playerID = onlinePlayer.getUniqueId();
                 PlayerData playerData = this.dataStore.getPlayerData(playerID);
                 playerData.setBonusClaimBlocks(playerData.getBonusClaimBlocks() + adjustment);
@@ -2424,26 +2154,21 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //setaccruedclaimblocks <player> <amount>
-        else if (cmd.getName().equalsIgnoreCase("setaccruedclaimblocks"))
-        {
+        else if (cmd.getName().equalsIgnoreCase("setaccruedclaimblocks")) {
             //requires exactly two parameters, the other player's name and the new amount
             if (args.length != 2) return false;
 
             //parse the adjustment amount
             int newAmount;
-            try
-            {
+            try {
                 newAmount = Integer.parseInt(args[1]);
-            }
-            catch (NumberFormatException numberFormatException)
-            {
+            } catch (NumberFormatException numberFormatException) {
                 return false;  //causes usage to be displayed
             }
 
             //find the specified player
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
-            if (targetPlayer == null)
-            {
+            if (targetPlayer == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
@@ -2461,22 +2186,19 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //trapped
-        else if (cmd.getName().equalsIgnoreCase("trapped") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("trapped") && player != null) {
             //FEATURE: empower players who get "stuck" in an area where they don't have permission to build to save themselves
 
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             Claim claim = this.dataStore.getClaimAt(player.getLocation(), false, playerData.lastClaim);
 
             //if another /trapped is pending, ignore this slash command
-            if (playerData.pendingTrapped)
-            {
+            if (playerData.pendingTrapped) {
                 return true;
             }
 
             //if the player isn't in a claim or has permission to build, tell him to man up
-            if (claim == null || claim.allowBuild(player, Material.AIR) == null)
-            {
+            if (claim == null || claim.allowBuild(player, Material.AIR) == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotTrappedHere);
                 return true;
             }
@@ -2486,15 +2208,13 @@ public class EterniaKamui extends JavaPlugin
             Bukkit.getPluginManager().callEvent(event);
 
             //if the player is in the nether or end, he's screwed (there's no way to programmatically find a safe place for him)
-            if (player.getWorld().getEnvironment() != Environment.NORMAL && event.getDestination() == null)
-            {
+            if (player.getWorld().getEnvironment() != Environment.NORMAL && event.getDestination() == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
                 return true;
             }
 
             //if the player is in an administrative claim and AllowTrappedInAdminClaims is false, he should contact an admin
-            if (!EterniaKamui.instance.config_claims_allowTrappedInAdminClaims && claim.isAdminClaim() && event.getDestination() == null)
-            {
+            if (!EterniaKamui.instance.config_claims_allowTrappedInAdminClaims && claim.isAdminClaim() && event.getDestination() == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
                 return true;
             }
@@ -2509,89 +2229,74 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //siege
-        else if (cmd.getName().equalsIgnoreCase("siege") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("siege") && player != null) {
             //error message for when siege mode is disabled
-            if (!this.siegeEnabledForWorld(player.getWorld()))
-            {
+            if (!this.siegeEnabledForWorld(player.getWorld())) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NonSiegeWorld);
                 return true;
             }
 
             //requires one argument
-            if (args.length > 1)
-            {
+            if (args.length > 1) {
                 return false;
             }
 
             //can't start a siege when you're already involved in one
             Player attacker = player;
             PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
-            if (attackerData.siegeData != null)
-            {
+            if (attackerData.siegeData != null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.AlreadySieging);
                 return true;
             }
 
             //can't start a siege when you're protected from pvp combat
-            if (attackerData.pvpImmune)
-            {
+            if (attackerData.pvpImmune) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.CantFightWhileImmune);
                 return true;
             }
 
             //if a player name was specified, use that
             Player defender = null;
-            if (args.length >= 1)
-            {
+            if (args.length >= 1) {
                 defender = this.getServer().getPlayer(args[0]);
-                if (defender == null)
-                {
+                if (defender == null) {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                     return true;
                 }
             }
 
             //otherwise use the last player this player was in pvp combat with
-            else if (attackerData.lastPvpPlayer.length() > 0)
-            {
+            else if (attackerData.lastPvpPlayer.length() > 0) {
                 defender = this.getServer().getPlayer(attackerData.lastPvpPlayer);
-                if (defender == null)
-                {
+                if (defender == null) {
                     return false;
                 }
-            }
-            else
-            {
+            } else {
                 return false;
             }
 
             // First off, you cannot siege yourself, that's just
             // silly:
-            if (attacker.getName().equals(defender.getName()))
-            {
+            if (attacker.getName().equals(defender.getName())) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoSiegeYourself);
                 return true;
             }
 
             //victim must not have the permission which makes him immune to siege
-            if (defender.hasPermission("griefprevention.siegeimmune"))
-            {
+            if (defender.hasPermission("griefprevention.siegeimmune")) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.SiegeImmune);
                 return true;
             }
 
             //victim must not be under siege already
             PlayerData defenderData = this.dataStore.getPlayerData(defender.getUniqueId());
-            if (defenderData.siegeData != null)
-            {
+            if (defenderData.siegeData != null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.AlreadyUnderSiegePlayer);
                 return true;
             }
 
             //victim must not be pvp immune
-            if (defenderData.pvpImmune)
-            {
+            if (defenderData.pvpImmune) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoSiegeDefenseless);
                 return true;
             }
@@ -2599,36 +2304,31 @@ public class EterniaKamui extends JavaPlugin
             Claim defenderClaim = this.dataStore.getClaimAt(defender.getLocation(), false, null);
 
             //defender must have some level of permission there to be protected
-            if (defenderClaim == null || defenderClaim.allowAccess(defender) != null)
-            {
+            if (defenderClaim == null || defenderClaim.allowAccess(defender) != null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotSiegableThere);
                 return true;
             }
 
             //attacker must be close to the claim he wants to siege
-            if (!defenderClaim.isNear(attacker.getLocation(), 25))
-            {
+            if (!defenderClaim.isNear(attacker.getLocation(), 25)) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.SiegeTooFarAway);
                 return true;
             }
 
             //claim can't be under siege already
-            if (defenderClaim.siegeData != null)
-            {
+            if (defenderClaim.siegeData != null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.AlreadyUnderSiegeArea);
                 return true;
             }
 
             //can't siege admin claims
-            if (defenderClaim.isAdminClaim())
-            {
+            if (defenderClaim.isAdminClaim()) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoSiegeAdminClaim);
                 return true;
             }
 
             //can't be on cooldown
-            if (dataStore.onCooldown(attacker, defender, defenderClaim))
-            {
+            if (dataStore.onCooldown(attacker, defender, defenderClaim)) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.SiegeOnCooldown);
                 return true;
             }
@@ -2641,49 +2341,37 @@ public class EterniaKamui extends JavaPlugin
             EterniaKamui.sendMessage(player, TextMode.Success, Messages.SiegeConfirmed, defender.getName());
 
             return true;
-        }
-        else if (cmd.getName().equalsIgnoreCase("softmute"))
-        {
+        } else if (cmd.getName().equalsIgnoreCase("softmute")) {
             //requires one parameter
             if (args.length != 1) return false;
 
             //find the specified player
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
-            if (targetPlayer == null)
-            {
+            if (targetPlayer == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
             //toggle mute for player
             boolean isMuted = this.dataStore.toggleSoftMute(targetPlayer.getUniqueId());
-            if (isMuted)
-            {
+            if (isMuted) {
                 EterniaKamui.sendMessage(player, TextMode.Success, Messages.SoftMuted, targetPlayer.getName());
                 String executorName = "console";
-                if (player != null)
-                {
+                if (player != null) {
                     executorName = player.getName();
                 }
 
                 EterniaKamui.AddLogEntry(executorName + " muted " + targetPlayer.getName() + ".", CustomLogEntryTypes.AdminActivity, true);
-            }
-            else
-            {
+            } else {
                 EterniaKamui.sendMessage(player, TextMode.Success, Messages.UnSoftMuted, targetPlayer.getName());
             }
 
             return true;
-        }
-        else if (cmd.getName().equalsIgnoreCase("gpreload"))
-        {
+        } else if (cmd.getName().equalsIgnoreCase("gpreload")) {
             this.loadConfig();
-            if (player != null)
-            {
+            if (player != null) {
                 EterniaKamui.sendMessage(player, TextMode.Success, "Configuration updated.  If you have updated your Grief Prevention JAR, you still need to /reload or reboot your server.");
-            }
-            else
-            {
+            } else {
                 EterniaKamui.AddLogEntry("Configuration updated.  If you have updated your Grief Prevention JAR, you still need to /reload or reboot your server.");
             }
 
@@ -2691,16 +2379,14 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //givepet
-        else if (cmd.getName().equalsIgnoreCase("givepet") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("givepet") && player != null) {
             //requires one parameter
             if (args.length < 1) return false;
 
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
             //special case: cancellation
-            if (args[0].equalsIgnoreCase("cancel"))
-            {
+            if (args[0].equalsIgnoreCase("cancel")) {
                 playerData.petGiveawayRecipient = null;
                 EterniaKamui.sendMessage(player, TextMode.Success, Messages.PetTransferCancellation);
                 return true;
@@ -2708,8 +2394,7 @@ public class EterniaKamui extends JavaPlugin
 
             //find the specified player
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
-            if (targetPlayer == null)
-            {
+            if (targetPlayer == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
@@ -2724,8 +2409,7 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //gpblockinfo
-        else if (cmd.getName().equalsIgnoreCase("gpblockinfo") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("gpblockinfo") && player != null) {
             ItemStack inHand = player.getItemInHand();
             player.sendMessage("In Hand: " + String.format("%s(dValue:%s)", inHand.getType().name(), inHand.getData().getData()));
 
@@ -2736,15 +2420,13 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //ignoreplayer
-        else if (cmd.getName().equalsIgnoreCase("ignoreplayer") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("ignoreplayer") && player != null) {
             //requires target player name
             if (args.length < 1) return false;
 
             //validate target player
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
-            if (targetPlayer == null)
-            {
+            if (targetPlayer == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
@@ -2757,23 +2439,20 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //unignoreplayer
-        else if (cmd.getName().equalsIgnoreCase("unignoreplayer") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("unignoreplayer") && player != null) {
             //requires target player name
             if (args.length < 1) return false;
 
             //validate target player
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
-            if (targetPlayer == null)
-            {
+            if (targetPlayer == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             Boolean ignoreStatus = playerData.ignoredPlayers.get(targetPlayer.getUniqueId());
-            if (ignoreStatus == null || ignoreStatus == true)
-            {
+            if (ignoreStatus == null || ignoreStatus == true) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotIgnoringPlayer);
                 return true;
             }
@@ -2786,17 +2465,13 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //ignoredplayerlist
-        else if (cmd.getName().equalsIgnoreCase("ignoredplayerlist") && player != null)
-        {
+        else if (cmd.getName().equalsIgnoreCase("ignoredplayerlist") && player != null) {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             StringBuilder builder = new StringBuilder();
-            for (Entry<UUID, Boolean> entry : playerData.ignoredPlayers.entrySet())
-            {
-                if (entry.getValue() != null)
-                {
+            for (Entry<UUID, Boolean> entry : playerData.ignoredPlayers.entrySet()) {
+                if (entry.getValue() != null) {
                     //if not an admin ignore, add it to the list
-                    if (!entry.getValue())
-                    {
+                    if (!entry.getValue()) {
                         builder.append(EterniaKamui.lookupPlayerName(entry.getKey()));
                         builder.append(" ");
                     }
@@ -2804,12 +2479,9 @@ public class EterniaKamui extends JavaPlugin
             }
 
             String list = builder.toString().trim();
-            if (list.isEmpty())
-            {
+            if (list.isEmpty()) {
                 EterniaKamui.sendMessage(player, TextMode.Info, Messages.NotIgnoringAnyone);
-            }
-            else
-            {
+            } else {
                 EterniaKamui.sendMessage(player, TextMode.Info, list);
             }
 
@@ -2817,22 +2489,19 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //separateplayers
-        else if (cmd.getName().equalsIgnoreCase("separate"))
-        {
+        else if (cmd.getName().equalsIgnoreCase("separate")) {
             //requires two player names
             if (args.length < 2) return false;
 
             //validate target players
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
-            if (targetPlayer == null)
-            {
+            if (targetPlayer == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
             OfflinePlayer targetPlayer2 = this.resolvePlayerByName(args[1]);
-            if (targetPlayer2 == null)
-            {
+            if (targetPlayer2 == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
@@ -2845,22 +2514,19 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //unseparateplayers
-        else if (cmd.getName().equalsIgnoreCase("unseparate"))
-        {
+        else if (cmd.getName().equalsIgnoreCase("unseparate")) {
             //requires two player names
             if (args.length < 2) return false;
 
             //validate target players
             OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
-            if (targetPlayer == null)
-            {
+            if (targetPlayer == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
 
             OfflinePlayer targetPlayer2 = this.resolvePlayerByName(args[1]);
-            if (targetPlayer2 == null)
-            {
+            if (targetPlayer2 == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return true;
             }
@@ -2875,86 +2541,67 @@ public class EterniaKamui extends JavaPlugin
         return false;
     }
 
-    void setIgnoreStatus(OfflinePlayer ignorer, OfflinePlayer ignoree, IgnoreMode mode)
-    {
+    void setIgnoreStatus(OfflinePlayer ignorer, OfflinePlayer ignoree, IgnoreMode mode) {
         PlayerData playerData = this.dataStore.getPlayerData(ignorer.getUniqueId());
-        if (mode == IgnoreMode.None)
-        {
+        if (mode == IgnoreMode.None) {
             playerData.ignoredPlayers.remove(ignoree.getUniqueId());
-        }
-        else
-        {
+        } else {
             playerData.ignoredPlayers.put(ignoree.getUniqueId(), mode == IgnoreMode.StandardIgnore ? false : true);
         }
 
         playerData.ignoreListChanged = true;
-        if (!ignorer.isOnline())
-        {
+        if (!ignorer.isOnline()) {
             this.dataStore.savePlayerData(ignorer.getUniqueId(), playerData);
             this.dataStore.clearCachedPlayerData(ignorer.getUniqueId());
         }
     }
 
-    public enum IgnoreMode
-    {None, StandardIgnore, AdminIgnore}
+    public enum IgnoreMode {None, StandardIgnore, AdminIgnore}
 
-    private String trustEntryToPlayerName(String entry)
-    {
-        if (entry.startsWith("[") || entry.equals("public"))
-        {
+    private String trustEntryToPlayerName(String entry) {
+        if (entry.startsWith("[") || entry.equals("public")) {
             return entry;
-        }
-        else
-        {
+        } else {
             return EterniaKamui.lookupPlayerName(entry);
         }
     }
 
-    public static String getfriendlyLocationString(Location location)
-    {
+    public static String getfriendlyLocationString(Location location) {
         return location.getWorld().getName() + ": x" + location.getBlockX() + ", z" + location.getBlockZ();
     }
 
-    private boolean abandonClaimHandler(Player player, boolean deleteTopLevelClaim)
-    {
+    private boolean abandonClaimHandler(Player player, boolean deleteTopLevelClaim) {
         PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
         //which claim is being abandoned?
         Claim claim = this.dataStore.getClaimAt(player.getLocation(), true /*ignore height*/, null);
-        if (claim == null)
-        {
+        if (claim == null) {
             EterniaKamui.sendMessage(player, TextMode.Instr, Messages.AbandonClaimMissing);
         }
 
         //verify ownership
-        else if (claim.allowEdit(player) != null)
-        {
+        else if (claim.allowEdit(player) != null) {
             EterniaKamui.sendMessage(player, TextMode.Err, Messages.NotYourClaim);
         }
 
         //warn if has children and we're not explicitly deleting a top level claim
-        else if (claim.children.size() > 0 && !deleteTopLevelClaim)
-        {
+        else if (claim.children.size() > 0 && !deleteTopLevelClaim) {
             EterniaKamui.sendMessage(player, TextMode.Instr, Messages.DeleteTopLevelClaim);
             return true;
-        }
-        else
-        {
+        } else {
             //delete it
             claim.removeSurfaceFluids(null);
             this.dataStore.deleteClaim(claim, true, false);
 
             //if in a creative mode world, restore the claim area
-            if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()))
-            {
+            if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner())) {
                 EterniaKamui.AddLogEntry(player.getName() + " abandoned a claim @ " + EterniaKamui.getfriendlyLocationString(claim.getLesserBoundaryCorner()));
                 EterniaKamui.sendMessage(player, TextMode.Warn, Messages.UnclaimCleanupWarning);
                 EterniaKamui.instance.restoreClaim(claim, 20L * 60 * 2);
             }
 
             //adjust claim blocks when abandoning a top level claim
-            if (this.config_claims_abandonReturnRatio != 1.0D && claim.parent == null && claim.ownerID.equals(playerData.playerID))
-            {
+            if (this.config_claims_abandonReturnRatio != 1.0D && claim.parent == null && claim.ownerID.equals(playerData.playerID)) {
                 playerData.setAccruedClaimBlocks(playerData.getAccruedClaimBlocks() - (int) Math.ceil((claim.getArea() * (1 - this.config_claims_abandonReturnRatio))));
             }
 
@@ -2973,8 +2620,7 @@ public class EterniaKamui extends JavaPlugin
     }
 
     //helper method keeps the trust commands consistent and eliminates duplicate code
-    private void handleTrustCommand(Player player, ClaimPermission permissionLevel, String recipientName)
-    {
+    private void handleTrustCommand(Player player, ClaimPermission permissionLevel, String recipientName) {
         //determine which claim the player is standing in
         Claim claim = this.dataStore.getClaimAt(player.getLocation(), true /*ignore height*/, null);
 
@@ -2982,54 +2628,39 @@ public class EterniaKamui extends JavaPlugin
         String permission = null;
         OfflinePlayer otherPlayer = null;
         UUID recipientID = null;
-        if (recipientName.startsWith("[") && recipientName.endsWith("]"))
-        {
+        if (recipientName.startsWith("[") && recipientName.endsWith("]")) {
             permission = recipientName.substring(1, recipientName.length() - 1);
-            if (permission == null || permission.isEmpty())
-            {
+            if (permission == null || permission.isEmpty()) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.InvalidPermissionID);
                 return;
             }
-        }
-        else if (recipientName.contains("."))
-        {
+        } else if (recipientName.contains(".")) {
             permission = recipientName;
-        }
-        else
-        {
+        } else {
             otherPlayer = this.resolvePlayerByName(recipientName);
-            if (otherPlayer == null && !recipientName.equals("public") && !recipientName.equals("all"))
-            {
+            if (otherPlayer == null && !recipientName.equals("public") && !recipientName.equals("all")) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
                 return;
             }
 
-            if (otherPlayer != null)
-            {
+            if (otherPlayer != null) {
                 recipientName = otherPlayer.getName();
                 recipientID = otherPlayer.getUniqueId();
-            }
-            else
-            {
+            } else {
                 recipientName = "public";
             }
         }
 
         //determine which claims should be modified
         ArrayList<Claim> targetClaims = new ArrayList<Claim>();
-        if (claim == null)
-        {
+        if (claim == null) {
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
-            for (int i = 0; i < playerData.getClaims().size(); i++)
-            {
+            for (int i = 0; i < playerData.getClaims().size(); i++) {
                 targetClaims.add(playerData.getClaims().get(i));
             }
-        }
-        else
-        {
+        } else {
             //check permission here
-            if (claim.allowGrantPermission(player) != null)
-            {
+            if (claim.allowGrantPermission(player) != null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoPermissionTrust, claim.getOwnerName());
                 return;
             }
@@ -3038,20 +2669,16 @@ public class EterniaKamui extends JavaPlugin
             String errorMessage = null;
 
             //permission level null indicates granting permission trust
-            if (permissionLevel == null)
-            {
+            if (permissionLevel == null) {
                 errorMessage = claim.allowEdit(player);
-                if (errorMessage != null)
-                {
+                if (errorMessage != null) {
                     errorMessage = "Only " + claim.getOwnerName() + " can grant /PermissionTrust here.";
                 }
             }
 
             //otherwise just use the ClaimPermission enum values
-            else
-            {
-                switch (permissionLevel)
-                {
+            else {
+                switch (permissionLevel) {
                     case Access:
                         errorMessage = claim.allowAccess(player);
                         break;
@@ -3064,8 +2691,7 @@ public class EterniaKamui extends JavaPlugin
             }
 
             //error message for trying to grant a permission the player doesn't have
-            if (errorMessage != null)
-            {
+            if (errorMessage != null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.CantGrantThatPermission);
                 return;
             }
@@ -3074,19 +2700,15 @@ public class EterniaKamui extends JavaPlugin
         }
 
         //if we didn't determine which claims to modify, tell the player to be specific
-        if (targetClaims.size() == 0)
-        {
+        if (targetClaims.size() == 0) {
             EterniaKamui.sendMessage(player, TextMode.Err, Messages.GrantPermissionNoClaim);
             return;
         }
 
         String identifierToAdd = recipientName;
-        if (permission != null)
-        {
+        if (permission != null) {
             identifierToAdd = "[" + permission + "]";
-        }
-        else if (recipientID != null)
-        {
+        } else if (recipientID != null) {
             identifierToAdd = recipientID.toString();
         }
 
@@ -3094,25 +2716,19 @@ public class EterniaKamui extends JavaPlugin
         TrustChangedEvent event = new TrustChangedEvent(player, targetClaims, permissionLevel, true, identifierToAdd);
         Bukkit.getPluginManager().callEvent(event);
 
-        if (event.isCancelled())
-        {
+        if (event.isCancelled()) {
             return;
         }
 
         //apply changes
-        for (int i = 0; i < targetClaims.size(); i++)
-        {
+        for (int i = 0; i < targetClaims.size(); i++) {
             Claim currentClaim = targetClaims.get(i);
 
-            if (permissionLevel == null)
-            {
-                if (!currentClaim.managers.contains(identifierToAdd))
-                {
+            if (permissionLevel == null) {
+                if (!currentClaim.managers.contains(identifierToAdd)) {
                     currentClaim.managers.add(identifierToAdd);
                 }
-            }
-            else
-            {
+            } else {
                 currentClaim.setPermission(identifierToAdd, permissionLevel);
             }
             this.dataStore.saveClaim(currentClaim);
@@ -3121,30 +2737,21 @@ public class EterniaKamui extends JavaPlugin
         //notify player
         if (recipientName.equals("public")) recipientName = this.dataStore.getMessage(Messages.CollectivePublic);
         String permissionDescription;
-        if (permissionLevel == null)
-        {
+        if (permissionLevel == null) {
             permissionDescription = this.dataStore.getMessage(Messages.PermissionsPermission);
-        }
-        else if (permissionLevel == ClaimPermission.Build)
-        {
+        } else if (permissionLevel == ClaimPermission.Build) {
             permissionDescription = this.dataStore.getMessage(Messages.BuildPermission);
-        }
-        else if (permissionLevel == ClaimPermission.Access)
-        {
+        } else if (permissionLevel == ClaimPermission.Access) {
             permissionDescription = this.dataStore.getMessage(Messages.AccessPermission);
-        }
-        else //ClaimPermission.Inventory
+        } else //ClaimPermission.Inventory
         {
             permissionDescription = this.dataStore.getMessage(Messages.ContainersPermission);
         }
 
         String location;
-        if (claim == null)
-        {
+        if (claim == null) {
             location = this.dataStore.getMessage(Messages.LocationAllClaims);
-        }
-        else
-        {
+        } else {
             location = this.dataStore.getMessage(Messages.LocationCurrentClaim);
         }
 
@@ -3155,25 +2762,20 @@ public class EterniaKamui extends JavaPlugin
     ConcurrentHashMap<String, UUID> playerNameToIDMap = new ConcurrentHashMap<String, UUID>();
 
     //thread to build the above cache
-    private class CacheOfflinePlayerNamesThread extends Thread
-    {
+    private class CacheOfflinePlayerNamesThread extends Thread {
         private OfflinePlayer[] offlinePlayers;
         private ConcurrentHashMap<String, UUID> playerNameToIDMap;
 
-        CacheOfflinePlayerNamesThread(OfflinePlayer[] offlinePlayers, ConcurrentHashMap<String, UUID> playerNameToIDMap)
-        {
+        CacheOfflinePlayerNamesThread(OfflinePlayer[] offlinePlayers, ConcurrentHashMap<String, UUID> playerNameToIDMap) {
             this.offlinePlayers = offlinePlayers;
             this.playerNameToIDMap = playerNameToIDMap;
         }
 
-        public void run()
-        {
+        public void run() {
             long now = System.currentTimeMillis();
             final long millisecondsPerDay = 1000 * 60 * 60 * 24;
-            for (OfflinePlayer player : offlinePlayers)
-            {
-                try
-                {
+            for (OfflinePlayer player : offlinePlayers) {
+                try {
                     UUID playerID = player.getUniqueId();
                     if (playerID == null) continue;
                     long lastSeen = player.getLastPlayed();
@@ -3181,16 +2783,13 @@ public class EterniaKamui extends JavaPlugin
                     //if the player has been seen in the last 90 days, cache his name/UUID pair
                     long diff = now - lastSeen;
                     long daysDiff = diff / millisecondsPerDay;
-                    if (daysDiff <= config_advanced_offlineplayer_cache_days)
-                    {
+                    if (daysDiff <= config_advanced_offlineplayer_cache_days) {
                         String playerName = player.getName();
                         if (playerName == null) continue;
                         this.playerNameToIDMap.put(playerName, playerID);
                         this.playerNameToIDMap.put(playerName.toLowerCase(), playerID);
                     }
-                }
-                catch (Exception e)
-                {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
@@ -3198,8 +2797,7 @@ public class EterniaKamui extends JavaPlugin
     }
 
 
-    public OfflinePlayer resolvePlayerByName(String name)
-    {
+    public OfflinePlayer resolvePlayerByName(String name) {
         //try online players first
         Player targetPlayer = this.getServer().getPlayerExact(name);
         if (targetPlayer != null) return targetPlayer;
@@ -3210,12 +2808,10 @@ public class EterniaKamui extends JavaPlugin
         bestMatchID = this.playerNameToIDMap.get(name);
 
         //if failed, try ignore case
-        if (bestMatchID == null)
-        {
+        if (bestMatchID == null) {
             bestMatchID = this.playerNameToIDMap.get(name.toLowerCase());
         }
-        if (bestMatchID == null)
-        {
+        if (bestMatchID == null) {
             return null;
         }
 
@@ -3223,41 +2819,32 @@ public class EterniaKamui extends JavaPlugin
     }
 
     //helper method to resolve a player name from the player's UUID
-    static String lookupPlayerName(UUID playerID)
-    {
+    static String lookupPlayerName(UUID playerID) {
         //parameter validation
         if (playerID == null) return "somebody";
 
         //check the cache
         OfflinePlayer player = EterniaKamui.instance.getServer().getOfflinePlayer(playerID);
-        if (player.hasPlayedBefore() || player.isOnline())
-        {
+        if (player.hasPlayedBefore() || player.isOnline()) {
             return player.getName();
-        }
-        else
-        {
+        } else {
             return "someone(" + playerID.toString() + ")";
         }
     }
 
     //cache for player name lookups, to save searches of all offline players
-    static void cacheUUIDNamePair(UUID playerID, String playerName)
-    {
+    static void cacheUUIDNamePair(UUID playerID, String playerName) {
         //store the reverse mapping
         EterniaKamui.instance.playerNameToIDMap.put(playerName, playerID);
         EterniaKamui.instance.playerNameToIDMap.put(playerName.toLowerCase(), playerID);
     }
 
     //string overload for above helper
-    static String lookupPlayerName(String playerID)
-    {
+    static String lookupPlayerName(String playerID) {
         UUID id;
-        try
-        {
+        try {
             id = UUID.fromString(playerID);
-        }
-        catch (IllegalArgumentException ex)
-        {
+        } catch (IllegalArgumentException ex) {
             EterniaKamui.AddLogEntry("Error: Tried to look up a local player name for invalid UUID: " + playerID);
             return "someone";
         }
@@ -3265,13 +2852,11 @@ public class EterniaKamui extends JavaPlugin
         return lookupPlayerName(id);
     }
 
-    public void onDisable()
-    {
+    public void onDisable() {
         //save data for any online players
         @SuppressWarnings("unchecked")
         Collection<Player> players = (Collection<Player>) this.getServer().getOnlinePlayers();
-        for (Player player : players)
-        {
+        for (Player player : players) {
             UUID playerID = player.getUniqueId();
             PlayerData playerData = this.dataStore.getPlayerData(playerID);
             this.dataStore.savePlayerDataSync(playerID, playerData);
@@ -3286,8 +2871,7 @@ public class EterniaKamui extends JavaPlugin
     }
 
     //called when a player spawns, applies protection for that player if necessary
-    public void checkPvpProtectionNeeded(Player player)
-    {
+    public void checkPvpProtectionNeeded(Player player) {
         //if anti spawn camping feature is not enabled, do nothing
         if (!this.config_pvp_protectFreshSpawns) return;
 
@@ -3301,8 +2885,7 @@ public class EterniaKamui extends JavaPlugin
         if (player.hasPermission("griefprevention.nopvpimmunity")) return;
 
         //check inventory for well, anything
-        if (EterniaKamui.isInventoryEmpty(player))
-        {
+        if (EterniaKamui.isInventoryEmpty(player)) {
             //if empty, apply immunity
             PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
             playerData.pvpImmune = true;
@@ -3316,21 +2899,18 @@ public class EterniaKamui extends JavaPlugin
         }
     }
 
-    static boolean isInventoryEmpty(Player player)
-    {
+    static boolean isInventoryEmpty(Player player) {
         PlayerInventory inventory = player.getInventory();
         ItemStack[] armorStacks = inventory.getArmorContents();
 
         //check armor slots, stop if any items are found
-        for (int i = 0; i < armorStacks.length; i++)
-        {
+        for (int i = 0; i < armorStacks.length; i++) {
             if (!(armorStacks[i] == null || armorStacks[i].getType() == Material.AIR)) return false;
         }
 
         //check other slots, stop if any items are found
         ItemStack[] generalStacks = inventory.getContents();
-        for (int i = 0; i < generalStacks.length; i++)
-        {
+        for (int i = 0; i < generalStacks.length; i++) {
             if (!(generalStacks[i] == null || generalStacks[i].getType() == Material.AIR)) return false;
         }
 
@@ -3338,31 +2918,26 @@ public class EterniaKamui extends JavaPlugin
     }
 
     //checks whether players siege in a world
-    public boolean siegeEnabledForWorld(World world)
-    {
+    public boolean siegeEnabledForWorld(World world) {
         return this.config_siege_enabledWorlds.contains(world);
     }
 
     //moves a player from the claim he's in to a nearby wilderness location
-    public Location ejectPlayer(Player player)
-    {
+    public Location ejectPlayer(Player player) {
         //look for a suitable location
         Location candidateLocation = player.getLocation();
-        while (true)
-        {
+        while (true) {
             Claim claim = null;
             claim = EterniaKamui.instance.dataStore.getClaimAt(candidateLocation, false, null);
 
             //if there's a claim here, keep looking
-            if (claim != null)
-            {
+            if (claim != null) {
                 candidateLocation = new Location(claim.lesserBoundaryCorner.getWorld(), claim.lesserBoundaryCorner.getBlockX() - 1, claim.lesserBoundaryCorner.getBlockY(), claim.lesserBoundaryCorner.getBlockZ() - 1);
                 continue;
             }
 
             //otherwise find a safe place to teleport the player
-            else
-            {
+            else {
                 //find a safe height, a couple of blocks above the surface
                 GuaranteeChunkLoaded(candidateLocation);
                 Block highestBlock = candidateLocation.getWorld().getHighestBlockAt(candidateLocation.getBlockX(), candidateLocation.getBlockZ());
@@ -3375,77 +2950,62 @@ public class EterniaKamui extends JavaPlugin
 
     //ensures a piece of the managed world is loaded into server memory
     //(generates the chunk if necessary)
-    private static void GuaranteeChunkLoaded(Location location)
-    {
+    private static void GuaranteeChunkLoaded(Location location) {
         Chunk chunk = location.getChunk();
         while (!chunk.isLoaded() || !chunk.load(true)) ;
     }
 
     //sends a color-coded message to a player
-    public static void sendMessage(Player player, ChatColor color, Messages messageID, String... args)
-    {
+    public static void sendMessage(Player player, ChatColor color, Messages messageID, String... args) {
         sendMessage(player, color, messageID, 0, args);
     }
 
     //sends a color-coded message to a player
-    public static void sendMessage(Player player, ChatColor color, Messages messageID, long delayInTicks, String... args)
-    {
+    public static void sendMessage(Player player, ChatColor color, Messages messageID, long delayInTicks, String... args) {
         String message = EterniaKamui.instance.dataStore.getMessage(messageID, args);
         sendMessage(player, color, message, delayInTicks);
     }
 
     //sends a color-coded message to a player
-    public static void sendMessage(Player player, ChatColor color, String message)
-    {
+    public static void sendMessage(Player player, ChatColor color, String message) {
         if (message == null || message.length() == 0) return;
 
-        if (player == null)
-        {
+        if (player == null) {
             EterniaKamui.AddLogEntry(color + message);
-        }
-        else
-        {
+        } else {
             player.sendMessage(color + message);
         }
     }
 
-    public static void sendMessage(Player player, ChatColor color, String message, long delayInTicks)
-    {
+    public static void sendMessage(Player player, ChatColor color, String message, long delayInTicks) {
         SendPlayerMessageTask task = new SendPlayerMessageTask(player, color, message);
 
         //Only schedule if there should be a delay. Otherwise, send the message right now, else the message will appear out of order.
-        if (delayInTicks > 0)
-        {
+        if (delayInTicks > 0) {
             EterniaKamui.instance.getServer().getScheduler().runTaskLater(EterniaKamui.instance, task, delayInTicks);
-        }
-        else
-        {
+        } else {
             task.run();
         }
     }
 
     //checks whether players can create claims in a world
-    public boolean claimsEnabledForWorld(World world)
-    {
+    public boolean claimsEnabledForWorld(World world) {
         ClaimsMode mode = this.config_claims_worldModes.get(world);
         return mode != null && mode != ClaimsMode.Disabled;
     }
 
     //determines whether creative anti-grief rules apply at a location
-    boolean creativeRulesApply(Location location)
-    {
+    boolean creativeRulesApply(Location location) {
         if (!this.config_creativeWorldsExist) return false;
 
         return this.config_claims_worldModes.get((location.getWorld())) == ClaimsMode.Creative;
     }
 
-    public String allowBuild(Player player, Location location)
-    {
+    public String allowBuild(Player player, Location location) {
         return this.allowBuild(player, location, location.getBlock().getType());
     }
 
-    public String allowBuild(Player player, Location location, Material material)
-    {
+    public String allowBuild(Player player, Location location, Material material) {
         if (!EterniaKamui.instance.claimsEnabledForWorld(location.getWorld())) return null;
 
         PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
@@ -3455,49 +3015,40 @@ public class EterniaKamui extends JavaPlugin
         if (playerData.ignoreClaims) return null;
 
         //wilderness rules
-        if (claim == null)
-        {
+        if (claim == null) {
             //no building in the wilderness in creative mode
-            if (this.creativeRulesApply(location) || this.config_claims_worldModes.get(location.getWorld()) == ClaimsMode.SurvivalRequiringClaims)
-            {
+            if (this.creativeRulesApply(location) || this.config_claims_worldModes.get(location.getWorld()) == ClaimsMode.SurvivalRequiringClaims) {
                 //exception: when chest claims are enabled, players who have zero land claims and are placing a chest
-                if (material != Material.CHEST || playerData.getClaims().size() > 0 || EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius == -1)
-                {
+                if (material != Material.CHEST || playerData.getClaims().size() > 0 || EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius == -1) {
                     String reason = this.dataStore.getMessage(Messages.NoBuildOutsideClaims);
                     if (player.hasPermission("griefprevention.ignoreclaims"))
                         reason += "  " + this.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
                     reason += "  " + this.dataStore.getMessage(Messages.CreativeBasicsVideo2, DataStore.CREATIVE_VIDEO_URL);
                     return reason;
-                }
-                else
-                {
+                } else {
                     return null;
                 }
             }
 
             //but it's fine in survival mode
-            else
-            {
+            else {
                 return null;
             }
         }
 
         //if not in the wilderness, then apply claim rules (permissions, etc)
-        else
-        {
+        else {
             //cache the claim for later reference
             playerData.lastClaim = claim;
             return claim.allowBuild(player, material);
         }
     }
 
-    public String allowBreak(Player player, Block block, Location location)
-    {
+    public String allowBreak(Player player, Block block, Location location) {
         return this.allowBreak(player, block, location, null);
     }
 
-    public String allowBreak(Player player, Block block, Location location, BlockBreakEvent breakEvent)
-    {
+    public String allowBreak(Player player, Block block, Location location, BlockBreakEvent breakEvent) {
         if (!EterniaKamui.instance.claimsEnabledForWorld(location.getWorld())) return null;
 
         PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
@@ -3507,11 +3058,9 @@ public class EterniaKamui extends JavaPlugin
         if (playerData.ignoreClaims) return null;
 
         //wilderness rules
-        if (claim == null)
-        {
+        if (claim == null) {
             //no building in the wilderness in creative mode
-            if (this.creativeRulesApply(location) || this.config_claims_worldModes.get(location.getWorld()) == ClaimsMode.SurvivalRequiringClaims)
-            {
+            if (this.creativeRulesApply(location) || this.config_claims_worldModes.get(location.getWorld()) == ClaimsMode.SurvivalRequiringClaims) {
                 String reason = this.dataStore.getMessage(Messages.NoBuildOutsideClaims);
                 if (player.hasPermission("griefprevention.ignoreclaims"))
                     reason += "  " + this.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
@@ -3520,24 +3069,19 @@ public class EterniaKamui extends JavaPlugin
             }
 
             //but it's fine in survival mode
-            else
-            {
+            else {
                 return null;
             }
-        }
-        else
-        {
+        } else {
             //cache the claim for later reference
             playerData.lastClaim = claim;
 
             //if not in the wilderness, then apply claim rules (permissions, etc)
             String cancel = claim.allowBreak(player, block.getType());
-            if (cancel != null && breakEvent != null)
-            {
+            if (cancel != null && breakEvent != null) {
                 PreventBlockBreakEvent preventionEvent = new PreventBlockBreakEvent(breakEvent);
                 Bukkit.getPluginManager().callEvent(preventionEvent);
-                if (preventionEvent.isCancelled())
-                {
+                if (preventionEvent.isCancelled()) {
                     cancel = null;
                 }
             }
@@ -3549,8 +3093,7 @@ public class EterniaKamui extends JavaPlugin
     //restores nature in multiple chunks, as described by a claim instance
     //this restores all chunks which have ANY number of claim blocks from this claim in them
     //if the claim is still active (in the data store), then the claimed blocks will not be changed (only the area bordering the claim)
-    public void restoreClaim(Claim claim, long delayInTicks)
-    {
+    public void restoreClaim(Claim claim, long delayInTicks) {
         //admin claims aren't automatically cleaned up when deleted or abandoned
         if (claim.isAdminClaim()) return;
 
@@ -3558,26 +3101,21 @@ public class EterniaKamui extends JavaPlugin
         if (claim.getArea() > 10000) return;
 
         ArrayList<Chunk> chunks = claim.getChunks();
-        for (Chunk chunk : chunks)
-        {
+        for (Chunk chunk : chunks) {
             this.restoreChunk(chunk, this.getSeaLevel(chunk.getWorld()) - 15, false, delayInTicks, null);
         }
     }
 
 
-    public void restoreChunk(Chunk chunk, int miny, boolean aggressiveMode, long delayInTicks, Player playerReceivingVisualization)
-    {
+    public void restoreChunk(Chunk chunk, int miny, boolean aggressiveMode, long delayInTicks, Player playerReceivingVisualization) {
         //build a snapshot of this chunk, including 1 block boundary outside of the chunk all the way around
         int maxHeight = chunk.getWorld().getMaxHeight();
         BlockSnapshot[][][] snapshots = new BlockSnapshot[18][maxHeight][18];
         Block startBlock = chunk.getBlock(0, 0, 0);
         Location startLocation = new Location(chunk.getWorld(), startBlock.getX() - 1, 0, startBlock.getZ() - 1);
-        for (int x = 0; x < snapshots.length; x++)
-        {
-            for (int z = 0; z < snapshots[0][0].length; z++)
-            {
-                for (int y = 0; y < snapshots[0].length; y++)
-                {
+        for (int x = 0; x < snapshots.length; x++) {
+            for (int z = 0; z < snapshots[0][0].length; z++) {
+                for (int y = 0; y < snapshots[0].length; y++) {
                     Block block = chunk.getWorld().getBlockAt(startLocation.getBlockX() + x, startLocation.getBlockY() + y, startLocation.getBlockZ() + z);
                     snapshots[x][y][z] = new BlockSnapshot(block.getLocation(), block.getType(), block.getBlockData());
                 }
@@ -3594,56 +3132,45 @@ public class EterniaKamui extends JavaPlugin
         EterniaKamui.instance.getServer().getScheduler().runTaskLaterAsynchronously(EterniaKamui.instance, task, delayInTicks);
     }
 
-    private void parseMaterialListFromConfig(List<String> stringsToParse, MaterialCollection materialCollection)
-    {
+    private void parseMaterialListFromConfig(List<String> stringsToParse, MaterialCollection materialCollection) {
         materialCollection.clear();
 
         //for each string in the list
-        for (int i = 0; i < stringsToParse.size(); i++)
-        {
+        for (int i = 0; i < stringsToParse.size(); i++) {
             //try to parse the string value into a material info
             MaterialInfo materialInfo = MaterialInfo.fromString(stringsToParse.get(i));
 
             //null value returned indicates an error parsing the string from the config file
-            if (materialInfo == null)
-            {
+            if (materialInfo == null) {
                 //show error in log
                 EterniaKamui.AddLogEntry("ERROR: Unable to read a material entry from the config file.  Please update your config.yml.");
 
                 //update string, which will go out to config file to help user find the error entry
-                if (!stringsToParse.get(i).contains("can't"))
-                {
+                if (!stringsToParse.get(i).contains("can't")) {
                     stringsToParse.set(i, stringsToParse.get(i) + "     <-- can't understand this entry, see BukkitDev documentation");
                 }
             }
 
             //otherwise store the valid entry in config data
-            else
-            {
+            else {
                 materialCollection.Add(materialInfo);
             }
         }
     }
 
-    public int getSeaLevel(World world)
-    {
+    public int getSeaLevel(World world) {
         Integer overrideValue = this.config_seaLevelOverride.get(world.getName());
-        if (overrideValue == null || overrideValue == -1)
-        {
+        if (overrideValue == null || overrideValue == -1) {
             return world.getSeaLevel();
-        }
-        else
-        {
+        } else {
             return overrideValue;
         }
     }
 
-    private static Block getTargetNonAirBlock(Player player, int maxDistance) throws IllegalStateException
-    {
+    private static Block getTargetNonAirBlock(Player player, int maxDistance) throws IllegalStateException {
         BlockIterator iterator = new BlockIterator(player.getLocation(), player.getEyeHeight(), maxDistance);
         Block result = player.getLocation().getBlock().getRelative(BlockFace.UP);
-        while (iterator.hasNext())
-        {
+        while (iterator.hasNext()) {
             result = iterator.next();
             if (result.getType() != Material.AIR) return result;
         }
@@ -3651,18 +3178,15 @@ public class EterniaKamui extends JavaPlugin
         return result;
     }
 
-    public boolean containsBlockedIP(String message)
-    {
+    public boolean containsBlockedIP(String message) {
         message = message.replace("\r\n", "");
         Pattern ipAddressPattern = Pattern.compile("([0-9]{1,3}\\.){3}[0-9]{1,3}");
         Matcher matcher = ipAddressPattern.matcher(message);
 
         //if it looks like an IP address
-        if (matcher.find())
-        {
+        if (matcher.find()) {
             //and it's not in the list of allowed IP addresses
-            if (!EterniaKamui.instance.config_spam_allowedIpAddresses.contains(matcher.group()))
-            {
+            if (!EterniaKamui.instance.config_spam_allowedIpAddresses.contains(matcher.group())) {
                 return true;
             }
         }
@@ -3670,19 +3194,15 @@ public class EterniaKamui extends JavaPlugin
         return false;
     }
 
-    void autoExtendClaim(Claim newClaim)
-    {
+    void autoExtendClaim(Claim newClaim) {
         //auto-extend it downward to cover anything already built underground
         Location lesserCorner = newClaim.getLesserBoundaryCorner();
         Location greaterCorner = newClaim.getGreaterBoundaryCorner();
         World world = lesserCorner.getWorld();
         ArrayList<ChunkSnapshot> snapshots = new ArrayList<ChunkSnapshot>();
-        for (int chunkx = lesserCorner.getBlockX() / 16; chunkx <= greaterCorner.getBlockX() / 16; chunkx++)
-        {
-            for (int chunkz = lesserCorner.getBlockZ() / 16; chunkz <= greaterCorner.getBlockZ() / 16; chunkz++)
-            {
-                if (world.isChunkLoaded(chunkx, chunkz))
-                {
+        for (int chunkx = lesserCorner.getBlockX() / 16; chunkx <= greaterCorner.getBlockX() / 16; chunkx++) {
+            for (int chunkz = lesserCorner.getBlockZ() / 16; chunkz <= greaterCorner.getBlockZ() / 16; chunkz++) {
+                if (world.isChunkLoaded(chunkx, chunkz)) {
                     snapshots.add(world.getChunkAt(chunkx, chunkz).getChunkSnapshot(true, true, false));
                 }
             }
@@ -3691,15 +3211,13 @@ public class EterniaKamui extends JavaPlugin
         Bukkit.getScheduler().runTaskAsynchronously(EterniaKamui.instance, new AutoExtendClaimTask(newClaim, snapshots, world.getEnvironment()));
     }
 
-    public boolean pvpRulesApply(World world)
-    {
+    public boolean pvpRulesApply(World world) {
         Boolean configSetting = this.config_pvp_specifiedWorlds.get(world);
         if (configSetting != null) return configSetting;
         return world.getPVP();
     }
 
-    public static boolean isNewToServer(Player player)
-    {
+    public static boolean isNewToServer(Player player) {
         if (player.getStatistic(Statistic.PICKUP, Material.OAK_LOG) > 0 ||
                 player.getStatistic(Statistic.PICKUP, Material.SPRUCE_LOG) > 0 ||
                 player.getStatistic(Statistic.PICKUP, Material.BIRCH_LOG) > 0 ||
@@ -3713,35 +3231,28 @@ public class EterniaKamui extends JavaPlugin
         return true;
     }
 
-    static void banPlayer(Player player, String reason, String source)
-    {
-        if (EterniaKamui.instance.config_ban_useCommand)
-        {
+    static void banPlayer(Player player, String reason, String source) {
+        if (EterniaKamui.instance.config_ban_useCommand) {
             Bukkit.getServer().dispatchCommand(
                     Bukkit.getConsoleSender(),
                     EterniaKamui.instance.config_ban_commandFormat.replace("%name%", player.getName()).replace("%reason%", reason));
-        }
-        else
-        {
+        } else {
             BanList bans = Bukkit.getServer().getBanList(Type.NAME);
             bans.addBan(player.getName(), reason, null, source);
 
             //kick
-            if (player.isOnline())
-            {
+            if (player.isOnline()) {
                 player.kickPlayer(reason);
             }
         }
     }
 
-    public ItemStack getItemInHand(Player player, EquipmentSlot hand)
-    {
+    public ItemStack getItemInHand(Player player, EquipmentSlot hand) {
         if (hand == EquipmentSlot.OFF_HAND) return player.getInventory().getItemInOffHand();
         return player.getInventory().getItemInMainHand();
     }
 
-    public boolean claimIsPvPSafeZone(Claim claim)
-    {
+    public boolean claimIsPvPSafeZone(Claim claim) {
         if (claim.siegeData != null)
             return false;
         return claim.isAdminClaim() && claim.parent == null && EterniaKamui.instance.config_pvp_noCombatInAdminLandClaims ||
@@ -3808,8 +3319,7 @@ public class EterniaKamui extends JavaPlugin
     //Track scheduled "rescues" so we can cancel them if the player happens to teleport elsewhere so we can cancel it.
     ConcurrentHashMap<UUID, BukkitTask> portalReturnTaskMap = new ConcurrentHashMap<UUID, BukkitTask>();
 
-    public void startRescueTask(Player player, Location location)
-    {
+    public void startRescueTask(Player player, Location location) {
         //Schedule task to reset player's portal cooldown after 30 seconds (Maximum timeout time for client, in case their network is slow and taking forever to load chunks)
         BukkitTask task = new CheckForPortalTrapTask(player, this, location).runTaskLater(EterniaKamui.instance, 600L);
 

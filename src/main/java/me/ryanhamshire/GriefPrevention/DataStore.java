@@ -1495,6 +1495,14 @@ public abstract class DataStore
         HashMap<String, CustomizableMessage> defaults = new HashMap<String, CustomizableMessage>();
 
         //initialize defaults
+        this.addDefault(defaults, Messages.NoOwner, "$8[$aE$9S$8]$7 Você não é dono desse terreno$8.", null);
+        this.addDefault(defaults, Messages.NoClaim, "$8[$aE$9S$8]$7 Não existe nenhuma claim aqui$8.", null);
+        this.addDefault(defaults, Messages.WorldCreated, "$8[$aE$9S$8]$3 {0}$7 criado com sucesso$8,$7 tipo $3{1} $7enviroment $3{2} $7inv clear {3}$8.", null);
+        this.addDefault(defaults, Messages.WorldAlready, "$8[$aE$9S$8]$3 {0}$7 já existe$8.", null);
+        this.addDefault(defaults, Messages.WorldDeleted, "$8[$aE$9S$8]$3 {0}$7 foi deletado$8.", null);
+        this.addDefault(defaults, Messages.WorldRemoved, "$8[$aE$9S$8]$3 {0}$7 foi removido$8.", null);
+        this.addDefault(defaults, Messages.WorldBase, "$8[$aE$9S$8]$7 Você não pode deletar um mundo base$8.", null);
+        this.addDefault(defaults, Messages.WorldNoExists, "$8[$aE$9S$8]$3 {0}$7 não existe$8.", null);
         this.addDefault(defaults, Messages.RespectingClaims, "Now respecting claims.", null);
         this.addDefault(defaults, Messages.IgnoringClaims, "Now ignoring claims.", null);
         this.addDefault(defaults, Messages.NoCreativeUnClaim, "You can't unclaim this land.  You can only make this claim larger or create additional claims.", null);
@@ -1563,6 +1571,7 @@ public abstract class DataStore
         this.addDefault(defaults, Messages.ManageUniversalPermissionsInstruction, "To manage permissions for ALL your claims, stand outside them.", null);
         this.addDefault(defaults, Messages.ManageOneClaimPermissionsInstruction, "To manage permissions for a specific claim, stand inside it.", null);
         this.addDefault(defaults, Messages.CollectivePublic, "the public", "as in 'granted the public permission to...'");
+
         this.addDefault(defaults, Messages.BuildPermission, "build", null);
         this.addDefault(defaults, Messages.ContainersPermission, "access containers and animals", null);
         this.addDefault(defaults, Messages.AccessPermission, "use buttons and levers", null);
