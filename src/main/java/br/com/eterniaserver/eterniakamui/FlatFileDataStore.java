@@ -18,6 +18,7 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
 import br.com.eterniaserver.eternialib.UUIDFetcher;
 import com.google.common.io.Files;
 import org.bukkit.Bukkit;
@@ -320,7 +321,7 @@ public class FlatFileDataStore extends DataStore {
         }
     }
 
-    void loadClaimData(File[] files) throws Exception {
+    void loadClaimData(File[] files) {
         ConcurrentHashMap<Claim, Long> orphans = new ConcurrentHashMap<>();
         for (int i = 0; i < files.length; i++) {
             if (files[i].isFile())  //avoids folders

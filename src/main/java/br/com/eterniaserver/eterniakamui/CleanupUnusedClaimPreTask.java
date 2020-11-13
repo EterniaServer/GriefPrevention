@@ -18,6 +18,7 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 
@@ -27,7 +28,7 @@ import java.util.UUID;
 //passes those data to a claim cleanup task which might decide to delete a claim for inactivity
 
 class CleanupUnusedClaimPreTask implements Runnable {
-    private UUID ownerID;
+    private final UUID ownerID;
 
     CleanupUnusedClaimPreTask(UUID uuid) {
         this.ownerID = uuid;

@@ -18,6 +18,9 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.Messages;
+import br.com.eterniaserver.eterniakamui.enums.ShovelMode;
+import br.com.eterniaserver.eterniakamui.enums.VisualizationType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlot;
 

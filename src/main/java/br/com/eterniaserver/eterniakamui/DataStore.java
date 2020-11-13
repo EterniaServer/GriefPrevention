@@ -18,12 +18,16 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.ClaimsMode;
+import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
+import br.com.eterniaserver.eterniakamui.enums.Messages;
+import br.com.eterniaserver.eterniakamui.enums.VisualizationType;
 import br.com.eterniaserver.eternialib.UUIDFetcher;
 import com.google.common.io.Files;
-import br.com.eterniaserver.eterniakamui.events.ClaimCreatedEvent;
-import br.com.eterniaserver.eterniakamui.events.ClaimDeletedEvent;
-import br.com.eterniaserver.eterniakamui.events.ClaimExtendEvent;
-import br.com.eterniaserver.eterniakamui.events.ClaimModifiedEvent;
+import br.com.eterniaserver.eterniakamui.api.events.ClaimCreatedEvent;
+import br.com.eterniaserver.eterniakamui.api.events.ClaimDeletedEvent;
+import br.com.eterniaserver.eterniakamui.api.events.ClaimExtendEvent;
+import br.com.eterniaserver.eterniakamui.api.events.ClaimModifiedEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
@@ -177,7 +181,7 @@ public abstract class DataStore {
             EterniaKamui.AddLogEntry("Successfully hooked into WorldGuard.");
         }
         //if failed, world guard compat features will just be disabled.
-        catch (ClassNotFoundException | NoClassDefFoundError ignored) {
+        catch (NoClassDefFoundError ignored) {
         }
     }
 
@@ -392,6 +396,8 @@ public abstract class DataStore {
     }
 
     private void addToChunkClaimMap(Claim claim) {
+        if (claim.parent != null) return;
+
         ArrayList<Long> chunkHashes = claim.getChunkHashes();
         for (Long chunkHash : chunkHashes) {
             ArrayList<Claim> claimsInChunk = this.chunksToClaimsMap.computeIfAbsent(chunkHash, k -> new ArrayList<>());

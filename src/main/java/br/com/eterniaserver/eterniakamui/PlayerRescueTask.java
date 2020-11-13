@@ -18,6 +18,7 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.Messages;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 

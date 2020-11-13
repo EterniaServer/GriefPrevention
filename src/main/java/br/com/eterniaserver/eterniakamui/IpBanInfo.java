@@ -21,6 +21,7 @@ package br.com.eterniaserver.eterniakamui;
 import java.net.InetAddress;
 
 public class IpBanInfo {
+
     final InetAddress address;
     final long expirationTimestamp;
     final String bannedAccountName;

@@ -1,27 +1,26 @@
-package br.com.eterniaserver.eterniakamui.events;
+package br.com.eterniaserver.eterniakamui.api.events;
 
-import br.com.eterniaserver.eterniakamui.Claim;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
+import org.bukkit.event.block.BlockBreakEvent;
 
-//if cancelled, GriefPrevention will not protect items dropped by a player on death
-public class ProtectDeathDropsEvent extends Event implements Cancellable {
+//if cancelled, GriefPrevention will allow a block to be broken which it would not have otherwise
+public class PreventBlockBreakEvent extends Event implements Cancellable {
     private static final HandlerList handlers = new HandlerList();
     private boolean cancelled = false;
+    private final BlockBreakEvent innerEvent;
 
     public static HandlerList getHandlerList() {
         return handlers;
     }
 
-    final Claim claim;
-
-    public ProtectDeathDropsEvent(Claim claim) {
-        this.claim = claim;
+    public PreventBlockBreakEvent(BlockBreakEvent innerEvent) {
+        this.innerEvent = innerEvent;
     }
 
-    public Claim getClaim() {
-        return this.claim;
+    public BlockBreakEvent getInnerEvent() {
+        return this.innerEvent;
     }
 
     @Override

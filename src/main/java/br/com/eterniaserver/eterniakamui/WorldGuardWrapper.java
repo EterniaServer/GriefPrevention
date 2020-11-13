@@ -1,5 +1,6 @@
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.World;
 import com.sk89q.worldguard.WorldGuard;
@@ -15,9 +16,9 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
 class WorldGuardWrapper {
-    private WorldGuardPlugin worldGuard;
+    private final WorldGuardPlugin worldGuard;
 
-    public WorldGuardWrapper() throws ClassNotFoundException {
+    public WorldGuardWrapper() {
         this.worldGuard = (WorldGuardPlugin) EterniaKamui.instance.getServer().getPluginManager().getPlugin("WorldGuard");
     }
 

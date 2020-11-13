@@ -1,16 +1,14 @@
-package br.com.eterniaserver.eterniakamui.events;
+package br.com.eterniaserver.eterniakamui.api.events;
 
 import br.com.eterniaserver.eterniakamui.Claim;
-import org.bukkit.Location;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 
-//if destination field is set, then GriefPrevention will send the player to that location instead of searching for one
-public class SaveTrappedPlayerEvent extends Event implements Cancellable {
+//if cancelled, GriefPrevention will not cancel the PvP event it's processing.
+public class PreventPvPEvent extends Event implements Cancellable {
     private static final HandlerList handlers = new HandlerList();
     private boolean cancelled = false;
-    private Location destination = null;
 
     public static HandlerList getHandlerList() {
         return handlers;
@@ -18,16 +16,8 @@ public class SaveTrappedPlayerEvent extends Event implements Cancellable {
 
     final Claim claim;
 
-    public SaveTrappedPlayerEvent(Claim claim) {
+    public PreventPvPEvent(Claim claim) {
         this.claim = claim;
-    }
-
-    public Location getDestination() {
-        return destination;
-    }
-
-    public void setDestination(Location destination) {
-        this.destination = destination;
     }
 
     public Claim getClaim() {

@@ -1,27 +1,28 @@
-package br.com.eterniaserver.eterniakamui.events;
+package br.com.eterniaserver.eterniakamui.api.events;
 
 import br.com.eterniaserver.eterniakamui.Claim;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 
-//if cancelled, GriefPrevention will not cancel the PvP event it's processing.
-public class PreventPvPEvent extends Event implements Cancellable {
+/**
+ * A cancellable event which is called when a claim's depth (lower y bound) is about to be extended.
+ * @author FrankHeijden
+ */
+public class ClaimExtendEvent extends Event implements Cancellable {
     private static final HandlerList handlers = new HandlerList();
-    private boolean cancelled = false;
 
     public static HandlerList getHandlerList() {
         return handlers;
     }
 
-    final Claim claim;
+    private final Claim claim;
+    private final int newDepth;
+    private boolean cancelled;
 
-    public PreventPvPEvent(Claim claim) {
+    public ClaimExtendEvent(Claim claim, int newDepth) {
         this.claim = claim;
-    }
-
-    public Claim getClaim() {
-        return this.claim;
+        this.newDepth = newDepth;
     }
 
     @Override
@@ -29,9 +30,17 @@ public class PreventPvPEvent extends Event implements Cancellable {
         return handlers;
     }
 
+    public Claim getClaim() {
+        return claim;
+    }
+
+    public int getNewDepth() {
+        return newDepth;
+    }
+
     @Override
     public boolean isCancelled() {
-        return this.cancelled;
+        return cancelled;
     }
 
     @Override

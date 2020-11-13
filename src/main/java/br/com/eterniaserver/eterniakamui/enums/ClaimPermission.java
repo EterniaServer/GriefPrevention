@@ -16,13 +16,23 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package br.com.eterniaserver.eterniakamui;
+package br.com.eterniaserver.eterniakamui.enums;
 
-//just an enumeration of the visualization types, which determine what materials will be for the fake blocks
-public enum VisualizationType {
-    Claim,
-    Subdivision,
-    ErrorClaim,
-    RestoreNature,
-    AdminClaim
+//basic enum stuff
+public enum ClaimPermission {
+    Build,
+    Inventory,
+    Access;
+
+    /**
+     * Check if a ClaimPermission is granted by another ClaimPermission.
+     *
+     * @param other the ClaimPermission to compare against
+     * @return true if this ClaimPermission is equal or lesser than the provided ClaimPermission
+     */
+    public boolean isGrantedBy(ClaimPermission other) {
+        // As this uses declaration order to compare, if trust levels are reordered this method must be rewritten.
+        return other != null && other.ordinal() <= this.ordinal();
+    }
+
 }

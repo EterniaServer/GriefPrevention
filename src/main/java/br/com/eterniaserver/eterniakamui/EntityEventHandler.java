@@ -18,11 +18,13 @@
 
 package br.com.eterniaserver.eterniakamui;
 
-import br.com.eterniaserver.eternialib.EQueries;
+import br.com.eterniaserver.eterniakamui.api.events.PreventPvPEvent;
+import br.com.eterniaserver.eterniakamui.api.events.ProtectDeathDropsEvent;
 
-import br.com.eterniaserver.eterniakamui.events.PreventPvPEvent;
-import br.com.eterniaserver.eterniakamui.events.ProtectDeathDropsEvent;
-
+import br.com.eterniaserver.eterniakamui.enums.ClaimsMode;
+import br.com.eterniaserver.eterniakamui.enums.Messages;
+import br.com.eterniaserver.eternialib.SQL;
+import br.com.eterniaserver.eternialib.sql.queries.Update;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -56,6 +58,7 @@ import org.bukkit.entity.Tameable;
 import org.bukkit.entity.ThrownPotion;
 import org.bukkit.entity.Vehicle;
 import org.bukkit.entity.WaterMob;
+import org.bukkit.entity.Zombie;
 import org.bukkit.entity.minecart.ExplosiveMinecart;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -259,6 +262,7 @@ public class EntityEventHandler implements Listener {
         Claim claim = EterniaKamui.instance.dataStore.getClaimAt(player.getLocation(), true, null);
         ClaimFlag claimFlag = PluginVars.claimFlags.get(claim.getID());
         int value = 0;
+        Update update;
         switch (slotInt) {
             case 2:
                 if (claimFlag.isCreatureSpawn()) {
@@ -267,7 +271,10 @@ public class EntityEventHandler implements Listener {
                     e.getView().setItem(slotInt, BaseCmdFlags.guiItensEnable.get(2));
                     value = 1;
                 }
-                EQueries.executeQuery("UPDATE ek_flags SET mobspawn='" + value + "' WHERE claimid='" + claim.getID() + "';");
+                update = new Update("ek_flags");
+                update.set.set("mobspawn", value);
+                update.where.set("claimid", claim.getID());
+                SQL.executeAsync(update);
                 claimFlag.setCreatureSpawn(value);
                 break;
             case 3:
@@ -277,7 +284,10 @@ public class EntityEventHandler implements Listener {
                     e.getView().setItem(slotInt, BaseCmdFlags.guiItensEnable.get(3));
                     value = 1;
                 }
-                EQueries.executeQuery("UPDATE ek_flags SET pvp='" + value + "' WHERE claimid='" + claim.getID() + "';");
+                update = new Update("ek_flags");
+                update.set.set("pvp", value);
+                update.where.set("claimid", claim.getID());
+                SQL.executeAsync(update);
                 claimFlag.setAllowPvP(value);
                 break;
             case 4:
@@ -287,7 +297,10 @@ public class EntityEventHandler implements Listener {
                     e.getView().setItem(slotInt, BaseCmdFlags.guiItensEnable.get(4));
                     value = 1;
                 }
-                EQueries.executeQuery("UPDATE ek_flags SET explosions='" + value + "' WHERE claimid='" + claim.getID() + "';");
+                update = new Update("ek_flags");
+                update.set.set("explosions", value);
+                update.where.set("claimid", claim.getID());
+                SQL.executeAsync(update);
                 claimFlag.setExplosions(value);
                 break;
             case 5:
@@ -297,7 +310,10 @@ public class EntityEventHandler implements Listener {
                     e.getView().setItem(slotInt, BaseCmdFlags.guiItensEnable.get(5));
                     value = 1;
                 }
-                EQueries.executeQuery("UPDATE ek_flags SET fluid='" + value + "' WHERE claimid='" + claim.getID() + "';");
+                update = new Update("ek_flags");
+                update.set.set("fluid", value);
+                update.where.set("claimid", claim.getID());
+                SQL.executeAsync(update);
                 claimFlag.setLiquidFluid(value);
                 break;
             case 6:
@@ -307,7 +323,10 @@ public class EntityEventHandler implements Listener {
                     e.getView().setItem(slotInt, BaseCmdFlags.guiItensEnable.get(9));
                     value = 1;
                 }
-                EQueries.executeQuery("UPDATE ek_flags SET keeplevel='" + value + "' WHERE claimid='" + claim.getID() + "';");
+                update = new Update("ek_flags");
+                update.set.set("keeplevel", value);
+                update.where.set("claimid", claim.getID());
+                SQL.executeAsync(update);
                 claimFlag.setKeepLevel(value);
                 break;
             default:
@@ -385,16 +404,7 @@ public class EntityEventHandler implements Listener {
             //if claim is under siege, allow soft blocks to be destroyed
             if (claim != null && claim.siegeData != null) {
                 Material material = block.getType();
-                boolean breakable = false;
-                for (int j = 0; j < EterniaKamui.instance.config_siege_blocks.size(); j++) {
-                    Material breakableMaterial = EterniaKamui.instance.config_siege_blocks.get(j);
-                    if (breakableMaterial == material) {
-                        breakable = true;
-                        explodedBlocks.add(block);
-                        break;
-                    }
-                }
-
+                boolean breakable = EterniaKamui.instance.config_siege_blocks.contains(material);
                 if (breakable) continue;
             }
 
@@ -472,8 +482,13 @@ public class EntityEventHandler implements Listener {
     public void onEntitySpawn(CreatureSpawnEvent event) {
 
         Claim claim = this.dataStore.getClaimAt(event.getEntity().getLocation(), false, null);
+
         if (claim != null && PluginVars.claimFlags.containsKey(claim.getID())) {
             if (!PluginVars.claimFlags.get(claim.getID()).isCreatureSpawn()) {
+                if (claim.isAdminClaim() && event instanceof Creature) {
+                    event.setCancelled(true);
+                    return;
+                }
                 if (event.getEntity() instanceof Monster) {
                     event.setCancelled(true);
                     return;
@@ -950,7 +965,7 @@ public class EntityEventHandler implements Listener {
                     //if attacker isn't a player, cancel
                     if (attacker == null) {
                         //exception case
-                        if (event.getEntityType() == EntityType.VILLAGER && damageSource != null && damageSource.getType() == EntityType.ZOMBIE) {
+                        if (event.getEntityType() == EntityType.VILLAGER && damageSource != null && damageSource instanceof Zombie) {
                             return;
                         }
 

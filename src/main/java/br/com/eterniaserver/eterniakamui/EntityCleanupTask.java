@@ -18,6 +18,8 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.ClaimsMode;
+import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Boat;

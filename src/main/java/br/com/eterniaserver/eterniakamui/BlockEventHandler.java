@@ -15,6 +15,9 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.Messages;
+import br.com.eterniaserver.eterniakamui.enums.PistonMode;
+import br.com.eterniaserver.eterniakamui.enums.VisualizationType;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
@@ -54,6 +57,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockSpreadEvent;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.hanging.HangingBreakEvent;
 import org.bukkit.event.inventory.InventoryPickupItemEvent;
 import org.bukkit.event.world.StructureGrowEvent;
 import org.bukkit.inventory.InventoryHolder;
@@ -64,6 +68,7 @@ import org.bukkit.projectiles.ProjectileSource;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -74,14 +79,14 @@ public class BlockEventHandler implements Listener {
     //convenience reference to singleton datastore
     private final DataStore dataStore;
 
-    private final ArrayList<Material> trashBlocks;
+    private final EnumSet<Material> trashBlocks;
 
     //constructor
     public BlockEventHandler(DataStore dataStore) {
         this.dataStore = dataStore;
 
         //create the list of blocks which will not trigger a warning when they're placed outside of land claims
-        this.trashBlocks = new ArrayList<>();
+        this.trashBlocks = EnumSet.noneOf(Material.class);
         this.trashBlocks.add(Material.COBBLESTONE);
         this.trashBlocks.add(Material.TORCH);
         this.trashBlocks.add(Material.DIRT);
@@ -417,19 +422,30 @@ public class BlockEventHandler implements Listener {
         return type == Material.HOPPER || type == Material.BEACON || type == Material.SPAWNER;
     }
 
+    @EventHandler(ignoreCancelled = true)
+    public void onItemFrameBrokenByBoat(final HangingBreakEvent event) {
+        if (event.getCause() != HangingBreakEvent.RemoveCause.PHYSICS) {
+            return;
+        }
+
+        if (this.dataStore.getClaimAt(event.getEntity().getLocation(), false, null) != null) {
+            event.setCancelled(true);
+        }
+    }
+
     //blocks "pushing" other players' blocks around (pistons)
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
     public void onBlockPistonExtend(BlockPistonExtendEvent event) {
         //return if piston checks are not enabled
-        onPistonEvent(event, event.getBlocks());
+        onPistonEvent(event, event.getBlocks(), false);
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
     public void onBlockPistonRetract(BlockPistonRetractEvent event) {
-        onPistonEvent(event, event.getBlocks());
+        onPistonEvent(event, event.getBlocks(), true);
     }
 
-    private void onPistonEvent(BlockPistonEvent event, List<Block> blocks) {
+    private void onPistonEvent(BlockPistonEvent event, List<Block> blocks, boolean isRetract) {
         PistonMode pistonMode = EterniaKamui.instance.config_pistonMovement;
         // Return if piston movements are ignored.
         if (pistonMode == PistonMode.IGNORED) return;
@@ -439,6 +455,7 @@ public class BlockEventHandler implements Listener {
         if (!EterniaKamui.instance.claimsEnabledForWorld(event.getBlock().getWorld())) return;
 
         BlockFace direction = event.getDirection();
+
         Block pistonBlock = event.getBlock();
         Claim pistonClaim = this.dataStore.getClaimAt(pistonBlock.getLocation(), false, null);
         //if no blocks moving, then only check to make sure we're not pushing into a claim from outside
@@ -449,9 +466,11 @@ public class BlockEventHandler implements Listener {
         }
         // If no blocks are moving, quickly check if another claim's boundaries are violated.
         if (blocks.isEmpty()) {
+            if (isRetract) return;
+
             Block invadedBlock = pistonBlock.getRelative(direction);
             Claim invadedClaim = this.dataStore.getClaimAt(invadedBlock.getLocation(), false, pistonClaim);
-            if (invadedClaim != null && (pistonClaim == null || !Objects.equals(pistonClaim.ownerID, invadedClaim.ownerID))) {
+            if (invadedClaim != null && (pistonClaim == null || !Objects.equals(pistonClaim.getOwnerID(), invadedClaim.getOwnerID()))) {
                 event.setCancelled(true);
             }
 
@@ -459,18 +478,20 @@ public class BlockEventHandler implements Listener {
         }
 
         int minX, maxX, minY, maxY, minZ, maxZ;
-        minX = maxX = pistonBlock.getX();
-        minY = maxY = pistonBlock.getY();
-        minZ = maxZ = pistonBlock.getZ();
+        Block movedBlock = blocks.get(0);
+        minX = maxX = movedBlock.getX();
+        minY = maxY = movedBlock.getY();
+        minZ = maxZ = movedBlock.getZ();
 
-        //if pistons are limited to same-claim block movement
-        for (Block block : blocks) {
-            minX = Math.min(minX, block.getX());
-            minY = Math.min(minY, block.getY());
-            minZ = Math.min(minZ, block.getZ());
-            maxX = Math.max(maxX, block.getX());
-            maxY = Math.max(maxY, block.getY());
-            maxZ = Math.max(maxZ, block.getZ());
+        // Fill in rest of bounding box with remaining blocks.
+        for (int count = 1; count < blocks.size(); ++count) {
+            movedBlock = blocks.get(count);
+            minX = Math.min(minX, movedBlock.getX());
+            minY = Math.min(minY, movedBlock.getY());
+            minZ = Math.min(minZ, movedBlock.getZ());
+            maxX = Math.max(maxX, movedBlock.getX());
+            maxY = Math.max(maxY, movedBlock.getY());
+            maxZ = Math.max(maxZ, movedBlock.getZ());
         }
         // Add direction to include invaded zone.
         if (direction.getModX() > 0)
@@ -492,8 +513,10 @@ public class BlockEventHandler implements Listener {
 
             return;
         }
-        if (minX == maxX && minZ == maxZ && direction == (event instanceof BlockPistonExtendEvent ? BlockFace.DOWN : BlockFace.UP))
-            return;
+
+        while (pistonClaim != null && pistonClaim.parent != null) pistonClaim = pistonClaim.parent;
+
+        if (minX == maxX && minZ == maxZ && direction == (isRetract ? BlockFace.UP : BlockFace.DOWN)) return;
 
 
         // Fast mode: Use the intersection of a cuboid containing all blocks instead of individual locations.
@@ -521,7 +544,7 @@ public class BlockEventHandler implements Listener {
                     continue;
 
                 // If owners are different, cancel.
-                if (pistonClaim == null || !Objects.equals(pistonClaim.ownerID, claim.ownerID)) {
+                if (pistonClaim == null || !Objects.equals(pistonClaim.getOwnerID(), claim.getOwnerID())) {
                     event.setCancelled(true);
                     return;
                 }
@@ -557,9 +580,13 @@ public class BlockEventHandler implements Listener {
             lastClaim = claim;
 
             // If pushing this block will change ownership, cancel the event and take away the piston (for performance reasons).
-            if (pistonClaim == null || !Objects.equals(pistonClaim.ownerID, claim.ownerID)) {
+            if (pistonClaim == null || !Objects.equals(pistonClaim.getOwnerID(), claim.getOwnerID())) {
                 event.setCancelled(true);
-                pistonBlock.getWorld().createExplosion(pistonBlock.getLocation(), 0);
+
+                if (EterniaKamui.instance.config_pistonExplosionSound) {
+                    pistonBlock.getWorld().createExplosion(pistonBlock.getLocation(), 0);
+                }
+
                 pistonBlock.getWorld().dropItem(pistonBlock.getLocation(), new ItemStack(event.isSticky() ? Material.STICKY_PISTON : Material.PISTON));
                 pistonBlock.setType(Material.AIR);
                 return;

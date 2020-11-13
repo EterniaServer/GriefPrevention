@@ -18,6 +18,7 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
 import com.google.common.io.Files;
 import org.bukkit.scheduler.BukkitScheduler;
 

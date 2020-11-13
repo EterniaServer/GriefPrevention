@@ -1,4 +1,4 @@
-package br.com.eterniaserver.eterniakamui.events;
+package br.com.eterniaserver.eterniakamui.api.events;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;

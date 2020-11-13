@@ -1,4 +1,4 @@
-package br.com.eterniaserver.eterniakamui;
+package br.com.eterniaserver.eterniakamui.enums;
 
 public enum PistonMode {
 

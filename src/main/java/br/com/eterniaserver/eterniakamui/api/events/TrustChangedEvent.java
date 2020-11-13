@@ -1,7 +1,7 @@
-package br.com.eterniaserver.eterniakamui.events;
+package br.com.eterniaserver.eterniakamui.api.events;
 
 import br.com.eterniaserver.eterniakamui.Claim;
-import br.com.eterniaserver.eterniakamui.ClaimPermission;
+import br.com.eterniaserver.eterniakamui.enums.ClaimPermission;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;

@@ -18,7 +18,8 @@
 
 package br.com.eterniaserver.eterniakamui;
 
-import br.com.eterniaserver.eterniakamui.events.ClaimExpirationEvent;
+import br.com.eterniaserver.eterniakamui.api.events.ClaimExpirationEvent;
+import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 
@@ -77,8 +78,7 @@ class CleanupUnusedClaimTask implements Runnable {
                 if (expireEventCanceled())
                     return;
                 //make a copy of this player's claim list
-                Vector<Claim> claims = new Vector<>();
-                claims.addAll(ownerData.getClaims());
+                Vector<Claim> claims = new Vector<>(ownerData.getClaims());
 
                 //delete them
                 EterniaKamui.instance.dataStore.deleteClaimsForPlayer(claim.ownerID, true);

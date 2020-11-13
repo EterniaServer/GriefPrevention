@@ -18,6 +18,8 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
+
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;

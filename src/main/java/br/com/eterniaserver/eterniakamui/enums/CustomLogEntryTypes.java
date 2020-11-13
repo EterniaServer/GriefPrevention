@@ -1,6 +1,6 @@
 /*
     GriefPrevention Server Plugin for Minecraft
-    Copyright (C) 2012 Ryan Hamshire
+    Copyright (C) 2015 Ryan Hamshire
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,14 +16,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package br.com.eterniaserver.eterniakamui;
+package br.com.eterniaserver.eterniakamui.enums;
 
-//enumeration for golden shovel modes
-public enum ShovelMode {
-    Basic,
-    Admin,
-    Subdivide,
-    RestoreNature,
-    RestoreNatureAggressive,
-    RestoreNatureFill
+public enum CustomLogEntryTypes {
+    SocialActivity,
+    SuspiciousActivity,
+    AdminActivity,
+    Debug,
+    Exception,
+    MutedChat
 }

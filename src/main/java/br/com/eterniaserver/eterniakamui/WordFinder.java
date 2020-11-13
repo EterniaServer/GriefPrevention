@@ -21,6 +21,8 @@ class WordFinder {
         if (patternString.length() > 1) {
             //trim extraneous leading pipe (|)
             patternString = patternString.substring(1);
+        } else {
+            return;
         }
 
         this.pattern = Pattern.compile(patternString, Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);

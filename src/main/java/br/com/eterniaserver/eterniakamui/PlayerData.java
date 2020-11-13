@@ -18,6 +18,8 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
+import br.com.eterniaserver.eterniakamui.enums.ShovelMode;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 

@@ -18,7 +18,8 @@
 
 package br.com.eterniaserver.eterniakamui;
 
-import br.com.eterniaserver.eterniakamui.events.AccrueClaimBlocksEvent;
+import br.com.eterniaserver.eterniakamui.api.events.AccrueClaimBlocksEvent;
+import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
 import org.bukkit.entity.Player;
 
 import java.util.Collection;

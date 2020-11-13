@@ -3,7 +3,6 @@ main: br.com.eterniaserver.eterniakamui.EterniaKamui
 softdepend: [Vault, WorldGuard, WorldEdit, EterniaServer]
 dev-url: https://dev.bukkit.org/projects/grief-prevention
 depend: [EterniaLib]
-loadbefore: [TheUnderground]
 version: '${project.version}-${git.commit.id.abbrev}'
 api-version: '1.16'
 commands:

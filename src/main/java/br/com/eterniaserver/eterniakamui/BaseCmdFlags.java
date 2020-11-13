@@ -4,9 +4,9 @@ import br.com.eterniaserver.acf.BaseCommand;
 import br.com.eterniaserver.acf.annotation.CommandAlias;
 import br.com.eterniaserver.acf.annotation.CommandPermission;
 import br.com.eterniaserver.acf.annotation.Description;
-import br.com.eterniaserver.eternialib.EQueries;
-import br.com.eterniaserver.eternialib.EterniaLib;
-import br.com.eterniaserver.eternialib.sql.Connections;
+import br.com.eterniaserver.eterniakamui.enums.Messages;
+import br.com.eterniaserver.eternialib.SQL;
+import br.com.eterniaserver.eternialib.sql.queries.Insert;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -18,6 +18,7 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -32,20 +33,26 @@ public class BaseCmdFlags extends BaseCommand {
 
     public BaseCmdFlags() {
 
-        if (EterniaLib.getMySQL()) {
-            EterniaLib.getConnections().executeSQLQuery(connection -> {
-                final PreparedStatement getHashMap = connection.prepareStatement("SELECT * FROM ek_flags;");
-                final ResultSet resultSet = getHashMap.executeQuery();
-                getFlags(resultSet);
-                getHashMap.close();
-                resultSet.close();
-            });
-        } else {
-            try (PreparedStatement getHashMap = Connections.getSQLite().prepareStatement("SELECT * FROM ek_flags;"); ResultSet resultSet = getHashMap.executeQuery()) {
-                getFlags(resultSet);
-            } catch (SQLException e) {
-                e.printStackTrace();
+        try (Connection connection = SQL.getConnection()) {
+            PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM ek_flags;");
+            preparedStatement.execute();
+            ResultSet resultSet = preparedStatement.getResultSet();
+            while (resultSet.next()) {
+                ClaimFlag claimFlag = new ClaimFlag();
+                claimFlag.setAllowPvP(resultSet.getInt("pvp"));
+                claimFlag.setCreatureSpawn(resultSet.getInt("mobspawn"));
+                claimFlag.setExplosions(resultSet.getInt("explosions"));
+                claimFlag.setKeepLevel(resultSet.getInt("keeplevel"));
+                claimFlag.setLiquidFluid(resultSet.getInt("fluid"));
+                claimFlag.setEnterMessage(resultSet.getString("enterm"));
+                claimFlag.setExitMessage(resultSet.getString("exitm"));
+                PluginVars.claimFlags.put(resultSet.getLong("claimid"), claimFlag);
             }
+            resultSet.close();
+            preparedStatement.close();
+
+        } catch (SQLException exception) {
+            exception.printStackTrace();
         }
 
         ItemStack itemStack = new ItemStack(Material.CARVED_PUMPKIN);
@@ -121,20 +128,6 @@ public class BaseCmdFlags extends BaseCommand {
 
     }
 
-    private void getFlags(ResultSet resultSet) throws SQLException {
-        while (resultSet.next()) {
-            ClaimFlag claimFlag = new ClaimFlag();
-            claimFlag.setAllowPvP(resultSet.getInt("pvp"));
-            claimFlag.setCreatureSpawn(resultSet.getInt("mobspawn"));
-            claimFlag.setExplosions(resultSet.getInt("explosions"));
-            claimFlag.setKeepLevel(resultSet.getInt("keeplevel"));
-            claimFlag.setLiquidFluid(resultSet.getInt("fluid"));
-            claimFlag.setEnterMessage(resultSet.getString("enterm"));
-            claimFlag.setExitMessage(resultSet.getString("exitm"));
-            PluginVars.claimFlags.put(resultSet.getLong("claimid"), claimFlag);
-        }
-    }
-
     private String getColor(String name) {
         return ChatColor.translateAlternateColorCodes('&', name);
     }
@@ -145,56 +138,63 @@ public class BaseCmdFlags extends BaseCommand {
     public void onFlag(Player player) {
         Claim claim = EterniaKamui.instance.dataStore.getClaimAt(player.getLocation(), true, null);
         if (claim != null) {
-            if (claim.getOwnerName().equals(player.getName())) {
-                if (!PluginVars.claimFlags.containsKey(claim.getID())) {
-                    PluginVars.claimFlags.put(claim.getID(), new ClaimFlag());
-                    EQueries.executeQuery("INSERT INTO ek_flags (claimid, mobspawn, fluid) VALUES ('" + claim.getID() + "', '" + 1 + "', '" + 1 + "');");
-                }
-                ClaimFlag claimFlag = PluginVars.claimFlags.get(claim.getID());
-                Inventory gui = Bukkit.getServer().createInventory(player, 9, "EterniaFlags");
-                gui.setItem(0, guiItensDisable.get(0));
-                gui.setItem(1, guiItensDisable.get(1));
-                gui.setItem(7, guiItensDisable.get(7));
-                gui.setItem(8, guiItensDisable.get(8));
-
-                if (claimFlag.isCreatureSpawn()) {
-                    gui.setItem(2, guiItensEnable.get(2));
-                } else {
-                    gui.setItem(2, guiItensDisable.get(2));
-                }
-
-                if (claimFlag.isAllowPvP()) {
-                    gui.setItem(3, guiItensEnable.get(3));
-                } else {
-                    gui.setItem(3, guiItensDisable.get(3));
-                }
-
-                if (claimFlag.isExplosions()) {
-                    gui.setItem(4, guiItensEnable.get(4));
-                } else {
-                    gui.setItem(4, guiItensDisable.get(4));
-                }
-
-                if (claimFlag.isLiquidFluid()) {
-                    gui.setItem(5, guiItensEnable.get(5));
-                } else {
-                    gui.setItem(5, guiItensDisable.get(5));
-                }
-
-                if (claimFlag.isKeepLevel()) {
-                    gui.setItem(6, guiItensEnable.get(6));
-                } else {
-                    gui.setItem(6, guiItensDisable.get(6));
-                }
-
-                player.closeInventory();
-                player.openInventory(gui);
+            if (claim.getOwnerName().equals(player.getName()) || player.hasPermission("eternia.admin")) {
+                openFlags(claim, player);
             } else {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoOwner);
             }
         } else {
             EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoClaim);
         }
+    }
+
+    public void openFlags(Claim claim, Player player) {
+        if (!PluginVars.claimFlags.containsKey(claim.getID())) {
+            PluginVars.claimFlags.put(claim.getID(), new ClaimFlag());
+            Insert insert = new Insert("ek_flags");
+            insert.columns.set("claimid", "mobspawn", "fluid");
+            insert.values.set(claim.getID(), 1, 1);
+            SQL.executeAsync(insert);
+        }
+        ClaimFlag claimFlag = PluginVars.claimFlags.get(claim.getID());
+        Inventory gui = Bukkit.getServer().createInventory(player, 9, "EterniaFlags");
+        gui.setItem(0, guiItensDisable.get(0));
+        gui.setItem(1, guiItensDisable.get(1));
+        gui.setItem(7, guiItensDisable.get(7));
+        gui.setItem(8, guiItensDisable.get(8));
+
+        if (claimFlag.isCreatureSpawn()) {
+            gui.setItem(2, guiItensEnable.get(2));
+        } else {
+            gui.setItem(2, guiItensDisable.get(2));
+        }
+
+        if (claimFlag.isAllowPvP()) {
+            gui.setItem(3, guiItensEnable.get(3));
+        } else {
+            gui.setItem(3, guiItensDisable.get(3));
+        }
+
+        if (claimFlag.isExplosions()) {
+            gui.setItem(4, guiItensEnable.get(4));
+        } else {
+            gui.setItem(4, guiItensDisable.get(4));
+        }
+
+        if (claimFlag.isLiquidFluid()) {
+            gui.setItem(5, guiItensEnable.get(5));
+        } else {
+            gui.setItem(5, guiItensDisable.get(5));
+        }
+
+        if (claimFlag.isKeepLevel()) {
+            gui.setItem(6, guiItensEnable.get(6));
+        } else {
+            gui.setItem(6, guiItensDisable.get(6));
+        }
+
+        player.closeInventory();
+        player.openInventory(gui);
     }
 
 }

@@ -1,7 +1,8 @@
 package br.com.eterniaserver.eterniakamui;
 
-import br.com.eterniaserver.eternialib.EQueries;
+import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
 import br.com.eterniaserver.eternialib.UUIDFetcher;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
@@ -69,12 +70,6 @@ public class DatabaseDataStore extends DataStore {
             EterniaKamui.AddLogEntry("ERROR: Unable to connect to database.  Check your config file settings.");
             throw e2;
         }
-
-        EQueries.executeQuery("CREATE TABLE IF NOT EXISTS ek_worlds (id INT(15), " +
-                "name VARCHAR(36), " +
-                "enviroment VARCHAR(36), " +
-                "type VARCHAR(36), " +
-                "invclear INT(1));", false);
 
         try {
             //ensure the data tables exist
@@ -227,7 +222,7 @@ public class DatabaseDataStore extends DataStore {
         ArrayList<Claim> subdivisionsToLoad = new ArrayList<>();
         List<World> validWorlds = Bukkit.getServer().getWorlds();
 
-        Long claimID;
+        long claimID;
         while (results.next()) {
             try {
                 //problematic claims will be removed from secondary storage, and never added to in-memory data store
@@ -246,7 +241,7 @@ public class DatabaseDataStore extends DataStore {
                     greaterBoundaryCorner = this.locationFromString(greaterCornerString, validWorlds);
                 } catch (Exception e) {
                     if (e.getMessage() != null && e.getMessage().contains("World not found")) {
-                        EterniaKamui.AddLogEntry("Failed to load a claim (ID:" + claimID.toString() + ") because its world isn't loaded (yet?).  Please delete the claim or contact the GriefPrevention developer with information about which plugin(s) you're using to load or create worlds.  " + lesserCornerString);
+                        EterniaKamui.AddLogEntry("Failed to load a claim (ID:" + Long.toString(claimID) + ") because its world isn't loaded (yet?).  Please delete the claim or contact the GriefPrevention developer with information about which plugin(s) you're using to load or create worlds.  " + lesserCornerString);
                         continue;
                     } else {
                         throw e;

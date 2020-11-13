@@ -18,6 +18,8 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.Messages;
+
 public class CustomizableMessage {
     public final Messages id;
     public final String text;

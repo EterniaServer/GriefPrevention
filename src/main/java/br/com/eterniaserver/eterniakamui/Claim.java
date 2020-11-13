@@ -18,6 +18,8 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.ClaimPermission;
+import br.com.eterniaserver.eterniakamui.enums.Messages;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -35,6 +37,8 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 //represents a player claim
@@ -317,7 +321,7 @@ public class Claim {
         return EterniaKamui.instance.dataStore.getMessage(Messages.OnlyOwnersModifyClaims, this.getOwnerName());
     }
 
-    private static final EnumSet<Material> PLACEABLE_FARMING_BLOCKS = EnumSet.of(
+    private static final Set<Material> PLACEABLE_FARMING_BLOCKS = EnumSet.of(
             Material.PUMPKIN_STEM,
             Material.WHEAT,
             Material.MELON_STEM,
@@ -418,16 +422,7 @@ public class Claim {
     public String allowBreak(Player player, Material material) {
         //if under siege, some blocks will be breakable
         if (this.siegeData != null || this.doorsOpen) {
-            boolean breakable = false;
-
-            //search for block type in list of breakable blocks
-            for (int i = 0; i < EterniaKamui.instance.config_siege_blocks.size(); i++) {
-                Material breakableMaterial = EterniaKamui.instance.config_siege_blocks.get(i);
-                if (breakableMaterial == material) {
-                    breakable = true;
-                    break;
-                }
-            }
+            boolean breakable = EterniaKamui.instance.config_siege_blocks.contains(material);
 
             //custom error messages for siege mode
             if (!breakable) {
@@ -632,6 +627,10 @@ public class Claim {
         return EterniaKamui.lookupPlayerName(this.ownerID);
     }
 
+    public UUID getOwnerID() {
+        return Objects.requireNonNullElse(this.parent, this).ownerID;
+    }
+
     //whether or not a location is in a claim
     //ignoreHeight = true means location UNDER the claim will return TRUE
     //excludeSubdivisions = true means that locations inside subdivisions of the claim will return FALSE
@@ -773,7 +772,7 @@ public class Claim {
     long getPlayerInvestmentScore() {
         //decide which blocks will be considered player placed
         Location lesserBoundaryCorner = this.getLesserBoundaryCorner();
-        ArrayList<Material> playerBlocks = RestoreNatureProcessingTask.getPlayerBlocks(lesserBoundaryCorner.getWorld().getEnvironment(), lesserBoundaryCorner.getBlock().getBiome());
+        Set<Material> playerBlocks = RestoreNatureProcessingTask.getPlayerBlocks(lesserBoundaryCorner.getWorld().getEnvironment(), lesserBoundaryCorner.getBlock().getBiome());
 
         //scan the claim for player placed blocks
         double score = 0;
