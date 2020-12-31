@@ -6,20 +6,16 @@
 
     <groupId>me.ryanhamshire</groupId>
     <artifactId>EterniaKamui</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
+
     <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
+
     <repositories>
         <repository>
             <id>paper-repo</id>
             <url>https://papermc.io/repo/repository/maven-public/</url>
-        </repository>
-        <repository>
-            <id>spigot-repo</id> 
-            <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url> 
         </repository>
         <repository>
             <id>worldedit-worldguard-repo</id>
@@ -35,51 +31,35 @@
         </repository>
     </repositories>
     <build>
-        <sourceDirectory>src/main/java</sourceDirectory>
-        <testSourceDirectory>src/test/java</testSourceDirectory>
-        <testResources>
-          <testResource>
-            <directory>src/test/resources</directory>
-          </testResource>
-        </testResources>
         <finalName>${project.name}</finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
-                <targetPath>.</targetPath>
                 <includes>
                     <include>plugin.yml</include>
                 </includes>
             </resource>
         </resources>
         <plugins>
-            <!-- append git commit hash to version-->
             <plugin>
-                <groupId>pl.project13.maven</groupId>
-                <artifactId>git-commit-id-plugin</artifactId>
-                <version>3.0.0</version>
-                <executions>
-                    <execution>
-                        <id>get-the-git-infos</id>
-                        <goals>
-                            <goal>revision</goal>
-                        </goals>
-                        <phase>validate</phase>
-                    </execution>
-                </executions>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <source>11</source>
+                    <target>11</target>
+                </configuration>
             </plugin>
         </plugins>
     </build>
     <dependencies>
-        <!--Bukkit API-->
         <dependency>
-                <groupId>org.spigotmc</groupId>
-                <artifactId>spigot-api</artifactId>
-                <version>1.16.3-R0.1-SNAPSHOT</version>
-                <scope>provided</scope>
+            <groupId>com.destroystokyo.paper</groupId>
+            <artifactId>paper-api</artifactId>
+            <version>1.16.4-R0.1-SNAPSHOT</version>
+            <scope>provided</scope>
         </dependency>
-         <!--Worldguard dependency-->
         <dependency>
                 <groupId>com.sk89q.worldguard</groupId>
                 <artifactId>worldguard-bukkit</artifactId>
@@ -100,18 +80,17 @@
                     </exclusion>
             </exclusions>
         </dependency>
-         <!--Vault dependency-->
         <dependency>
-                <groupId>net.milkbowl.vault</groupId>
-                <artifactId>VaultAPI</artifactId>
-                <version>1.7</version>
-                <scope>provided</scope>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.bukkit</groupId>
-                        <artifactId>bukkit</artifactId>
-                    </exclusion>
-                </exclusions>
+            <groupId>net.milkbowl.vault</groupId>
+            <artifactId>VaultAPI</artifactId>
+            <version>1.7</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.bukkit</groupId>
+                    <artifactId>bukkit</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>br.com.eterniaserver</groupId>
@@ -119,32 +98,5 @@
             <version>1.2.8</version>
             <scope>provided</scope>
         </dependency>
-        <!--Tests-->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>5.6.2</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.6.2</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>3.4.6</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-junit-jupiter</artifactId>
-            <version>3.4.6</version>
-            <scope>test</scope>
-        </dependency>
-
     </dependencies>
-
 </project>

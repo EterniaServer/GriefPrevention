@@ -1,5 +1,7 @@
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.objects.ClaimFlag;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

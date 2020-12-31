@@ -27,6 +27,7 @@ public enum Messages {
     WorldRemoved,
     WorldBase,
     WorldNoExists,
+    NoPvPInDay,
     RespectingClaims,
     IgnoringClaims,
     SuccessfulAbandon,

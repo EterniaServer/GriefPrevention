@@ -1,7 +1,7 @@
 name: EterniaKamui
 main: br.com.eterniaserver.eterniakamui.EterniaKamui
 softdepend: [Vault, WorldGuard, WorldEdit, EterniaServer]
-dev-url: https://dev.bukkit.org/projects/grief-prevention
+dev-url: https://github.com/EterniaServer/EterniaKamui
 depend: [EterniaLib]
 version: '${project.version}-${git.commit.id.abbrev}'
 api-version: '1.16'
@@ -140,10 +140,6 @@ commands:
       description: Lists permissions for the claim you're standing in.
       usage: /TrustList
       permission: griefprevention.claims
-    siege:
-      description: Initiates a siege versus another player.
-      usage: /Siege <playerName>
-      permission: griefprevention.siege
     ignoreclaims:
       description: Toggles ignore claims mode.
       usage: /IgnoreClaims
@@ -176,10 +172,6 @@ commands:
       usage: /ClaimExplosions
       permission: griefprevention.claims
       aliases: claimexplosion
-    softmute:
-      description: Toggles whether a player's messages will only reach other soft-muted players.
-      usage: /SoftMute <player>
-      permission: griefprevention.softmute
     gpreload:
       description: Reloads Grief Prevention's configuration settings.  Does NOT totally reload the entire plugin.
       usage: /gpreload
@@ -192,21 +184,6 @@ commands:
       description: Allows an administrator to get technical information about blocks in the world and items in hand.
       usage: /GPBlockInfo
       permission: griefprevention.gpblockinfo
-    ignoreplayer:
-      description: Ignores another player's chat messages.
-      usage: /IgnorePlayer <player name>
-      aliases: [ignore]
-      permission: griefprevention.ignore
-    unignoreplayer:
-      description: Unignores another player's chat messages.
-      usage: /UnIgnorePlayer <player name>
-      aliases: [unignore]
-      permission: griefprevention.ignore
-    ignoredplayerlist:
-      description: Lists the players you're ignoring in chat.
-      usage: /IgnoredPlayerList
-      aliases: [ignores, ignored, ignorelist, ignoredlist, listignores, listignored, ignoring]
-      permission: griefprevention.ignore
     separate:
       description: Forces two players to ignore each other in chat.
       usage: /Separate <player1> <player2>
@@ -232,35 +209,24 @@ permissions:
             griefprevention.adminclaims: true
             griefprevention.adjustclaimblocks: true
             griefprevention.deleteclaims: true
-            griefprevention.spam: true
             griefprevention.lava: true
             griefprevention.eavesdrop: true
             griefprevention.deathblow: true
-            griefprevention.softmute: true
             griefprevention.reload: true
             griefprevention.visualizenearbyclaims: true
             griefprevention.overrideclaimcountlimit: true
             griefprevention.transferclaim: true
             griefprevention.claimslistother: true
-            griefprevention.siegeimmune: true
             griefprevention.separate: true
             griefprevention.eavesdropsigns: true
             griefprevention.claimbook: true
-            griefprevention.notignorable: true
             griefprevention.seeinactivity: true
             griefprevention.eavesdropimmune: true
             griefprevention.deleteclaimsinworld: true
-            griefprevention.siegeteleport: true
             griefprevention.unlockothersdrops: true
             griefprevention.seeclaimsize: true
-    griefprevention.siegeimmune:
-        description: Makes a player immune to /Siege.
-        default: op
     griefprevention.givepet:
         description: Grants permission to use /GivePet.
-        default: true
-    griefprevention.siege:
-        description: Grants permission to use /Siege.
         default: true
     griefprevention.unlockdrops:
         description: Grants permission to use /UnlockDrops.
@@ -295,9 +261,6 @@ permissions:
     griefprevention.adjustclaimblocks:
         description: Grants permission to add or remove bonus blocks from a player's account.
         default: op
-    griefprevention.spam:
-        description: Grants permission to log in, send messages, and send commands rapidly.
-        default: op
     griefprevention.lava:
         description: Grants permission to place lava near the surface and outside of claims.
         default: op
@@ -315,9 +278,6 @@ permissions:
         default: op
     griefprevention.reload:
         description: Grants access to /gpreload.
-        default: op
-    griefprevention.softmute:
-        description: Grants access to /SoftMute.
         default: op
     griefprevention.claims:
         description: Grants access to claim-related slash commands.
@@ -340,14 +300,8 @@ permissions:
     griefprevention.separate:
         description: Grants access to /Separate and /UnSeparate.
         default: op
-    griefprevention.ignore:
-        description: Grants access to /Ignore, /Unignore, and /IgnoreList
-        default: true
     griefprevention.claimbook:
         description: Grants access to /ClaimBook.
-        default: op
-    griefprevention.notignorable:
-        description: Players with this permission can't be ignored.
         default: op
     griefprevention.seeinactivity:
         description: Players with this permission can see how long a claim owner has been offline.
@@ -367,6 +321,3 @@ permissions:
     griefprevention.mostaccrued:
         description: Players with this permission can accrue more claim blocks (limit specified in the config file).
         default: false
-    griefprevention.siegeteleport:
-        description: Players with this permission can teleport into and out of besieged areas.
-        default: op

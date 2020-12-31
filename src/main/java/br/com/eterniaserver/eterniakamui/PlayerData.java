@@ -19,6 +19,7 @@
 package br.com.eterniaserver.eterniakamui;
 
 import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
+import br.com.eterniaserver.eterniakamui.enums.Integers;
 import br.com.eterniaserver.eterniakamui.enums.ShovelMode;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
@@ -91,9 +92,6 @@ public class PlayerData {
     //the last claim this player was in, that we know of
     public Claim lastClaim = null;
 
-    //siege
-    public SiegeData siegeData = null;
-
     //pvp
     public long lastPvpTimestamp = 0;
     public String lastPvpPlayer = "";
@@ -102,9 +100,6 @@ public class PlayerData {
     public boolean warnedAboutMajorDeletion = false;
 
     public InetAddress ipAddress;
-
-    //for addons to set per-player claim limits. Any negative value will use config's value
-    private int AccruedClaimBlocksLimit = -1;
 
     //whether or not this player has received a message about unlocking death drops since his last death
     boolean receivedDropUnlockAdvertisement = false;
@@ -208,12 +203,12 @@ public class PlayerData {
                 this.accruedClaimBlocks = storageData.accruedClaimBlocks;
 
                 //ensure at least minimum accrued are accrued (in case of settings changes to increase initial amount)
-                if (EterniaKamui.instance.config_advanced_fixNegativeClaimblockAmounts && (this.accruedClaimBlocks < EterniaKamui.instance.config_claims_initialBlocks)) {
-                    this.accruedClaimBlocks = EterniaKamui.instance.config_claims_initialBlocks;
+                if (EterniaKamui.instance.config_advanced_fixNegativeClaimblockAmounts && (this.accruedClaimBlocks < EterniaKamui.getInt(Integers.CLAIMS_INITIAL_BLOCKS))) {
+                    this.accruedClaimBlocks = EterniaKamui.getInt(Integers.CLAIMS_INITIAL_BLOCKS);
                 }
 
             } else {
-                this.accruedClaimBlocks = EterniaKamui.instance.config_claims_initialBlocks;
+                this.accruedClaimBlocks = EterniaKamui.getInt(Integers.CLAIMS_INITIAL_BLOCKS);
             }
         }
 
@@ -295,13 +290,11 @@ public class PlayerData {
 
     //Limit can be changed by addons
     public int getAccruedClaimBlocksLimit() {
-        if (this.AccruedClaimBlocksLimit < 0)
-            return EterniaKamui.instance.config_claims_maxAccruedBlocks_default;
-        return this.AccruedClaimBlocksLimit;
-    }
-
-    public void setAccruedClaimBlocksLimit(int limit) {
-        this.AccruedClaimBlocksLimit = limit;
+        //for addons to set per-player claim limits. Any negative value will use config's value
+        int accruedClaimBlocksLimit = -1;
+        if (accruedClaimBlocksLimit < 0)
+            return EterniaKamui.getInt(Integers.CLAIMS_MAX_ACCRUED_BLOCKS);
+        return accruedClaimBlocksLimit;
     }
 
     public void accrueBlocks(int howMany) {

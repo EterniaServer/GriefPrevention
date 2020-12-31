@@ -18,7 +18,8 @@
 
 package br.com.eterniaserver.eterniakamui;
 
-import br.com.eterniaserver.eterniakamui.api.events.ClaimExpirationEvent;
+import br.com.eterniaserver.eterniakamui.enums.Integers;
+import br.com.eterniaserver.eterniakamui.events.ClaimExpirationEvent;
 import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -44,8 +45,8 @@ class CleanupUnusedClaimTask implements Runnable {
 
         //determine area of the default chest claim
         int areaOfDefaultClaim = 0;
-        if (EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius >= 0) {
-            areaOfDefaultClaim = (int) Math.pow(EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius * 2 + 1, 2);
+        if (EterniaKamui.getInt(Integers.CLAIMS_AUTOMATIC_CLAIMS_FOR_NEW_PLAYERS_RADIUS) >= 0) {
+            areaOfDefaultClaim = (int) Math.pow(EterniaKamui.getInt(Integers.CLAIMS_AUTOMATIC_CLAIMS_FOR_NEW_PLAYERS_RADIUS) * 2 + 1, 2);
         }
 
         //if this claim is a chest claim and those are set to expire
@@ -53,7 +54,7 @@ class CleanupUnusedClaimTask implements Runnable {
             //if the owner has been gone at least a week, and if he has ONLY the new player claim, it will be removed
             Calendar sevenDaysAgo = Calendar.getInstance();
             sevenDaysAgo.add(Calendar.DATE, -EterniaKamui.instance.config_claims_chestClaimExpirationDays);
-            boolean newPlayerClaimsExpired = sevenDaysAgo.getTime().after(new Date(ownerInfo.getLastPlayed()));
+            boolean newPlayerClaimsExpired = sevenDaysAgo.getTime().after(new Date(ownerInfo.getLastSeen()));
             if (newPlayerClaimsExpired && ownerData.getClaims().size() == 1) {
                 if (expireEventCanceled())
                     return;
@@ -70,13 +71,14 @@ class CleanupUnusedClaimTask implements Runnable {
         }
 
         //if configured to always remove claims after some inactivity period without exceptions...
-        else if (EterniaKamui.instance.config_claims_expirationDays > 0) {
+        else if (EterniaKamui.getInt(Integers.CLAIMS_EXPIRATION_DAYS) > 0) {
             Calendar earliestPermissibleLastLogin = Calendar.getInstance();
-            earliestPermissibleLastLogin.add(Calendar.DATE, -EterniaKamui.instance.config_claims_expirationDays);
+            earliestPermissibleLastLogin.add(Calendar.DATE, - EterniaKamui.getInt(Integers.CLAIMS_EXPIRATION_DAYS));
 
-            if (earliestPermissibleLastLogin.getTime().after(new Date(ownerInfo.getLastPlayed()))) {
-                if (expireEventCanceled())
+            if (earliestPermissibleLastLogin.getTime().after(new Date(ownerInfo.getLastSeen()))) {
+                if (expireEventCanceled()) {
                     return;
+                }
                 //make a copy of this player's claim list
                 Vector<Claim> claims = new Vector<>(ownerData.getClaims());
 
@@ -84,7 +86,7 @@ class CleanupUnusedClaimTask implements Runnable {
                 EterniaKamui.instance.dataStore.deleteClaimsForPlayer(claim.ownerID, true);
                 EterniaKamui.AddLogEntry(" All of " + claim.getOwnerName() + "'s claims have expired.", CustomLogEntryTypes.AdminActivity);
                 EterniaKamui.AddLogEntry("earliestPermissibleLastLogin#getTime: " + earliestPermissibleLastLogin.getTime(), CustomLogEntryTypes.Debug, true);
-                EterniaKamui.AddLogEntry("ownerInfo#getLastPlayed: " + ownerInfo.getLastPlayed(), CustomLogEntryTypes.Debug, true);
+                EterniaKamui.AddLogEntry("ownerInfo#getLastPlayed: " + ownerInfo.getLastSeen(), CustomLogEntryTypes.Debug, true);
 
                 for (Claim value : claims) {
                     //if configured to do so, restore the land to natural
@@ -106,7 +108,7 @@ class CleanupUnusedClaimTask implements Runnable {
                 //if the owner has been gone at least a week, and if he has ONLY the new player claim, it will be removed
                 Calendar sevenDaysAgo = Calendar.getInstance();
                 sevenDaysAgo.add(Calendar.DATE, -EterniaKamui.instance.config_claims_unusedClaimExpirationDays);
-                boolean claimExpired = sevenDaysAgo.getTime().after(new Date(ownerInfo.getLastPlayed()));
+                boolean claimExpired = sevenDaysAgo.getTime().after(new Date(ownerInfo.getLastSeen()));
                 if (claimExpired) {
                     if (expireEventCanceled())
                         return;

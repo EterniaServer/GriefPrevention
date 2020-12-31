@@ -65,7 +65,7 @@ class EquipShovelProcessingTask implements Runnable {
         }
 
         //if standing in a claim owned by the player, visualize it
-        Claim claim = EterniaKamui.instance.dataStore.getClaimAt(player.getLocation(), true, playerData.lastClaim);
+        Claim claim = EterniaKamui.instance.dataStore.getClaimAt(player.getLocation(), playerData.lastClaim);
         if (claim != null && claim.allowEdit(player) == null) {
             playerData.lastClaim = claim;
             Visualization.Apply(player, Visualization.FromClaim(claim, player.getEyeLocation().getBlockY(), VisualizationType.Claim, player.getLocation()));

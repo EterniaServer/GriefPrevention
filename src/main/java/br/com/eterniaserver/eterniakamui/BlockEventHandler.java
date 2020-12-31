@@ -15,9 +15,9 @@
 
 package br.com.eterniaserver.eterniakamui;
 
-import br.com.eterniaserver.eterniakamui.enums.Messages;
-import br.com.eterniaserver.eterniakamui.enums.PistonMode;
-import br.com.eterniaserver.eterniakamui.enums.VisualizationType;
+import br.com.eterniaserver.eterniakamui.enums.*;
+import br.com.eterniaserver.eterniakamui.util.BoundingBox;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
@@ -28,6 +28,7 @@ import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.World.Environment;
 import org.bukkit.block.Block;
+import org.bukkit.block.data.type.Chest;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Hopper;
@@ -73,6 +74,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 
 //event handlers related to blocks
 public class BlockEventHandler implements Listener {
@@ -146,20 +148,11 @@ public class BlockEventHandler implements Listener {
 
         String signMessage = lines.toString();
 
-        //prevent signs with blocked IP addresses
-        if (!player.hasPermission("griefprevention.spam") && EterniaKamui.instance.containsBlockedIP(signMessage)) {
-            event.setCancelled(true);
-            return;
-        }
-
-        PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
         //if not empty and wasn't the same as the last sign, log it and remember it for later
         //This has been temporarily removed since `signMessage` includes location, not just the message. Waste of memory IMO
-        //if(notEmpty && (playerData.lastSignMessage == null || !playerData.lastSignMessage.equals(signMessage)))
         if (notEmpty) {
             EterniaKamui.AddLogEntry(player.getName() + lines.toString().replace("\n  ", ";"), null);
             PlayerEventHandler.makeSocialLogEntry(player.getName(), signMessage);
-            //playerData.lastSignMessage = signMessage;
 
             if (!player.hasPermission("griefprevention.eavesdropsigns")) {
                 @SuppressWarnings("unchecked")
@@ -256,22 +249,20 @@ public class BlockEventHandler implements Listener {
         //if the block is being placed within or under an existing claim
         PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
         Claim claim = this.dataStore.getClaimAt(block.getLocation(), true, playerData.lastClaim);
+
+        //If block is a chest, don't allow a DoubleChest to form across a claim boundary
+        denyConnectingDoubleChestsAcrossClaimBoundary(claim, block, player);
+
         if (claim != null) {
             playerData.lastClaim = claim;
 
             //warn about TNT not destroying claimed blocks
-            if (block.getType() == Material.TNT && !claim.areExplosivesAllowed && playerData.siegeData == null) {
+            if (block.getType() == Material.TNT && !claim.areExplosivesAllowed) {
                 if (PluginVars.claimFlags.containsKey(claim.getID())) {
                     if (PluginVars.claimFlags.get(claim.getID()).isExplosions()) return;
                 }
                 EterniaKamui.sendMessage(player, TextMode.Warn, Messages.NoTNTDamageClaims);
                 EterniaKamui.sendMessage(player, TextMode.Instr, Messages.ClaimExplosivesAdvertisement);
-            }
-
-            //if the player has permission for the claim and he's placing UNDER the claim
-            if (block.getY() <= claim.lesserBoundaryCorner.getBlockY() && claim.allowBuild(player, block.getType()) == null) {
-                //extend the claim downward
-                this.dataStore.extendClaim(claim, block.getY() - EterniaKamui.instance.config_claims_claimsExtendIntoGroundDistance);
             }
 
             //allow for a build warning in the future
@@ -281,20 +272,15 @@ public class BlockEventHandler implements Listener {
         //FEATURE: automatically create a claim when a player who has no claims places a chest
 
         //otherwise if there's no claim, the player is placing a chest, and new player automatic claims are enabled
-        else if (EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius > -1 && player.hasPermission("griefprevention.createclaims") && block.getType() == Material.CHEST) {
-            //if the chest is too deep underground, don't create the claim and explain why
-            if (EterniaKamui.instance.config_claims_preventTheft && block.getY() < EterniaKamui.instance.config_claims_maxDepth) {
-                EterniaKamui.sendMessage(player, TextMode.Warn, Messages.TooDeepToClaim);
-                return;
-            }
+        else if (EterniaKamui.getInt(Integers.CLAIMS_AUTOMATIC_CLAIMS_FOR_NEW_PLAYERS_RADIUS) > -1 && player.hasPermission("griefprevention.createclaims") && block.getType() == Material.CHEST) {
 
-            int radius = EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius;
+            int radius = EterniaKamui.getInt(Integers.CLAIMS_AUTOMATIC_CLAIMS_FOR_NEW_PLAYERS_RADIUS);
 
             //if the player doesn't have any claims yet, automatically create a claim centered at the chest
             if (playerData.getClaims().size() == 0) {
                 //radius == 0 means protect ONLY the chest
-                if (EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius == 0) {
-                    this.dataStore.createClaim(block.getWorld(), block.getX(), block.getX(), block.getY(), block.getY(), block.getZ(), block.getZ(), player.getUniqueId(), null, null, player);
+                if (radius == 0) {
+                    this.dataStore.createClaim(block.getWorld(), block.getX(), block.getX(), block.getZ(), block.getZ(), player.getUniqueId(), null, null, player);
                     EterniaKamui.sendMessage(player, TextMode.Success, Messages.ChestClaimConfirmation);
                 }
 
@@ -315,7 +301,6 @@ public class BlockEventHandler implements Listener {
                             result = this.dataStore.createClaim(
                                     block.getWorld(),
                                     block.getX() - radius, block.getX() + radius,
-                                    block.getY() - EterniaKamui.instance.config_claims_claimsExtendIntoGroundDistance, block.getY(),
                                     block.getZ() - radius, block.getZ() + radius,
                                     player.getUniqueId(),
                                     null, null,
@@ -341,7 +326,7 @@ public class BlockEventHandler implements Listener {
             }
 
             //check to see if this chest is in a claim, and warn when it isn't
-            if (EterniaKamui.instance.config_claims_preventTheft && this.dataStore.getClaimAt(block.getLocation(), false, playerData.lastClaim) == null) {
+            if (EterniaKamui.getBool(Booleans.CLAIMS_PREVENT_THEFT) && this.dataStore.getClaimAt(block.getLocation(), false, playerData.lastClaim) == null) {
                 EterniaKamui.sendMessage(player, TextMode.Warn, Messages.UnprotectedChestWarning);
             }
         }
@@ -388,8 +373,7 @@ public class BlockEventHandler implements Listener {
         if (EterniaKamui.instance.config_blockSurfaceOtherExplosions && block.getType() == Material.TNT &&
                 block.getWorld().getEnvironment() != Environment.NETHER &&
                 block.getY() > EterniaKamui.instance.getSeaLevel(block.getWorld()) - 5 &&
-                claim == null &&
-                playerData.siegeData == null) {
+                claim == null) {
             EterniaKamui.sendMessage(player, TextMode.Warn, Messages.NoTNTDamageAboveSeaLevel);
         }
 
@@ -409,6 +393,51 @@ public class BlockEventHandler implements Listener {
             }
         }
     }
+
+    private static final BlockFace[] HORIZONTAL_DIRECTIONS = new BlockFace[] {
+        BlockFace.NORTH,
+        BlockFace.EAST,
+        BlockFace.SOUTH,
+        BlockFace.WEST
+    };
+
+    private void denyConnectingDoubleChestsAcrossClaimBoundary(Claim claim, Block block, Player player)
+    {
+        UUID claimOwner = null;
+        if (claim != null)
+            claimOwner = claim.getOwnerID();
+
+        // Check for double chests placed just outside the claim boundary
+        if (block.getBlockData() instanceof Chest)
+        {
+            for (BlockFace face : HORIZONTAL_DIRECTIONS)
+            {
+                Block relative = block.getRelative(face);
+                if (!(relative.getBlockData() instanceof Chest)) continue;
+
+                Claim relativeClaim = this.dataStore.getClaimAt(relative.getLocation(), true, claim);
+                UUID relativeClaimOwner = relativeClaim == null ? null : relativeClaim.getOwnerID();
+
+                // Chests outside claims should connect (both null)
+                // and chests inside the same claim should connect (equal)
+                if (Objects.equals(claimOwner, relativeClaimOwner)) break;
+
+                // Change both chests to singular chests
+                Chest chest = (Chest) block.getBlockData();
+                chest.setType(Chest.Type.SINGLE);
+                block.setBlockData(chest);
+
+                Chest relativeChest = (Chest) relative.getBlockData();
+                relativeChest.setType(Chest.Type.SINGLE);
+                relative.setBlockData(relativeChest);
+
+                // Resend relative chest block to prevent visual bug
+                player.sendBlockChange(relative.getLocation(), relativeChest);
+                break;
+            }
+        }
+    }
+
 
     static boolean isActiveBlock(Block block) {
         return isActiveBlock(block.getType());
@@ -445,152 +474,160 @@ public class BlockEventHandler implements Listener {
         onPistonEvent(event, event.getBlocks(), true);
     }
 
-    private void onPistonEvent(BlockPistonEvent event, List<Block> blocks, boolean isRetract) {
+    // Handle piston push and pulls.
+    private void onPistonEvent(BlockPistonEvent event, List<Block> blocks, boolean isRetract)
+    {
         PistonMode pistonMode = EterniaKamui.instance.config_pistonMovement;
         // Return if piston movements are ignored.
         if (pistonMode == PistonMode.IGNORED) return;
 
         // Don't check in worlds where claims are not enabled.
-        //don't track in worlds where claims are not enabled
         if (!EterniaKamui.instance.claimsEnabledForWorld(event.getBlock().getWorld())) return;
 
         BlockFace direction = event.getDirection();
-
         Block pistonBlock = event.getBlock();
-        Claim pistonClaim = this.dataStore.getClaimAt(pistonBlock.getLocation(), false, null);
-        //if no blocks moving, then only check to make sure we're not pushing into a claim from outside
-        //this avoids pistons breaking non-solids just inside a claim, like torches, doors, and touchplates
-        if (pistonClaim == null && pistonMode == PistonMode.CLAIMS_ONLY) {
+        Claim pistonClaim = this.dataStore.getClaimAt(pistonBlock.getLocation(),
+                pistonMode != PistonMode.CLAIMS_ONLY, null);
+
+        // A claim is required, but the piston is not inside a claim.
+        if (pistonClaim == null && pistonMode == PistonMode.CLAIMS_ONLY)
+        {
             event.setCancelled(true);
             return;
         }
+
         // If no blocks are moving, quickly check if another claim's boundaries are violated.
-        if (blocks.isEmpty()) {
+        if (blocks.isEmpty())
+        {
+            // No block and retraction is always safe.
             if (isRetract) return;
 
             Block invadedBlock = pistonBlock.getRelative(direction);
-            Claim invadedClaim = this.dataStore.getClaimAt(invadedBlock.getLocation(), false, pistonClaim);
-            if (invadedClaim != null && (pistonClaim == null || !Objects.equals(pistonClaim.getOwnerID(), invadedClaim.getOwnerID()))) {
+            Claim invadedClaim = this.dataStore.getClaimAt(invadedBlock.getLocation(),
+                    pistonMode != PistonMode.CLAIMS_ONLY, pistonClaim);
+            if (invadedClaim != null && (pistonClaim == null || !Objects.equals(pistonClaim.getOwnerID(), invadedClaim.getOwnerID())))
+            {
                 event.setCancelled(true);
             }
 
             return;
         }
 
-        int minX, maxX, minY, maxY, minZ, maxZ;
-        Block movedBlock = blocks.get(0);
-        minX = maxX = movedBlock.getX();
-        minY = maxY = movedBlock.getY();
-        minZ = maxZ = movedBlock.getZ();
+        // Create bounding box for moved blocks.
+        BoundingBox movedBlocks = BoundingBox.ofBlocks(blocks);
+        // Expand to include invaded zone.
+        movedBlocks.resize(direction, 1);
 
-        // Fill in rest of bounding box with remaining blocks.
-        for (int count = 1; count < blocks.size(); ++count) {
-            movedBlock = blocks.get(count);
-            minX = Math.min(minX, movedBlock.getX());
-            minY = Math.min(minY, movedBlock.getY());
-            minZ = Math.min(minZ, movedBlock.getZ());
-            maxX = Math.max(maxX, movedBlock.getX());
-            maxY = Math.max(maxY, movedBlock.getY());
-            maxZ = Math.max(maxZ, movedBlock.getZ());
-        }
-        // Add direction to include invaded zone.
-        if (direction.getModX() > 0)
-            maxX += direction.getModX();
-        else
-            minX += direction.getModX();
-        if (direction.getModY() > 0)
-            maxY += direction.getModY();
-        if (direction.getModZ() > 0)
-            maxZ += direction.getModZ();
-        else
-            minZ += direction.getModZ();
-        if (pistonMode == PistonMode.CLAIMS_ONLY) {
-            Location minLoc = pistonClaim.getLesserBoundaryCorner();
-            Location maxLoc = pistonClaim.getGreaterBoundaryCorner();
+        if (pistonClaim != null)
+        {
+            // If blocks are all inside the same claim as the piston, allow.
+            if (new BoundingBox(pistonClaim).contains(movedBlocks)) return;
 
-            if (minY < minLoc.getY() || minX < minLoc.getBlockX() || maxX > maxLoc.getBlockX() || minZ < minLoc.getBlockZ() || maxZ > maxLoc.getBlockZ())
+            /*
+             * In claims-only mode, all moved blocks must be inside of the owning claim.
+             * From BigScary:
+             *  - Could push into another land claim, don't want to spend CPU checking for that
+             *  - Push ice out, place torch, get water outside the claim
+             */
+            if (pistonMode == PistonMode.CLAIMS_ONLY)
+            {
                 event.setCancelled(true);
-
-            return;
-        }
-
-        while (pistonClaim != null && pistonClaim.parent != null) pistonClaim = pistonClaim.parent;
-
-        if (minX == maxX && minZ == maxZ && direction == (isRetract ? BlockFace.UP : BlockFace.DOWN)) return;
-
-
-        // Fast mode: Use the intersection of a cuboid containing all blocks instead of individual locations.
-        if (pistonMode == PistonMode.EVERYWHERE_SIMPLE) {
-            ArrayList<Claim> intersectable = new ArrayList<>();
-            int chunkXMax = maxX >> 4;
-            int chunkZMax = maxZ >> 4;
-
-            for (int chunkX = minX >> 4; chunkX <= chunkXMax; ++chunkX) {
-                for (int chunkZ = minZ >> 4; chunkZ <= chunkZMax; ++chunkZ) {
-                    ArrayList<Claim> chunkClaims = dataStore.chunksToClaimsMap.get(DataStore.getChunkHash(chunkX, chunkZ));
-                    if (chunkClaims != null)
-                        intersectable.addAll(chunkClaims);
-                }
-            }
-            //if any of the blocks are being pushed into a claim from outside, cancel the event
-            for (Claim claim : intersectable) {
-                if (claim == pistonClaim) continue;
-
-                Location minLoc = claim.getLesserBoundaryCorner();
-                Location maxLoc = claim.getGreaterBoundaryCorner();
-
-                // Ensure claim intersects with bounding box.
-                if (maxY < minLoc.getBlockY() || minX > maxLoc.getBlockX() || maxX < minLoc.getBlockX() || minZ > maxLoc.getBlockZ() || maxZ < minLoc.getBlockZ())
-                    continue;
-
-                // If owners are different, cancel.
-                if (pistonClaim == null || !Objects.equals(pistonClaim.getOwnerID(), claim.getOwnerID())) {
-                    event.setCancelled(true);
-                    return;
-                }
-            }
-            return;
-        }
-        Claim lastClaim = pistonClaim;
-        HashSet<Block> checkBlocks = new HashSet<>(blocks);
-        // Add all blocks that will be occupied after the shift.
-        for (Block block : blocks)
-            if (block.getPistonMoveReaction() != PistonMoveReaction.BREAK)
-                checkBlocks.add(block.getRelative(direction));
-        for (Block block : checkBlocks) {
-            // Reimplement DataStore#getClaimAt to ignore subclaims to maximize performance.
-            Location location = block.getLocation();
-            Claim claim = null;
-            if (lastClaim != null && lastClaim.inDataStore && lastClaim.contains(location, false, true))
-                claim = lastClaim;
-            else {
-                ArrayList<Claim> chunkClaims = dataStore.chunksToClaimsMap.get(DataStore.getChunkHash(location));
-                if (chunkClaims != null) {
-                    //if pulled block isn't in the same land claim, cancel the event
-                    for (Claim chunkClaim : chunkClaims) {
-                        if (chunkClaim.contains(location, false, true)) {
-                            claim = chunkClaim;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (claim == null) continue;
-            lastClaim = claim;
-
-            // If pushing this block will change ownership, cancel the event and take away the piston (for performance reasons).
-            if (pistonClaim == null || !Objects.equals(pistonClaim.getOwnerID(), claim.getOwnerID())) {
-                event.setCancelled(true);
-
-                if (EterniaKamui.instance.config_pistonExplosionSound) {
-                    pistonBlock.getWorld().createExplosion(pistonBlock.getLocation(), 0);
-                }
-
-                pistonBlock.getWorld().dropItem(pistonBlock.getLocation(), new ItemStack(event.isSticky() ? Material.STICKY_PISTON : Material.PISTON));
-                pistonBlock.setType(Material.AIR);
                 return;
             }
+        }
+
+        // Check if blocks are in line vertically.
+        if (movedBlocks.getLength() == 1 && movedBlocks.getWidth() == 1)
+        {
+            // Pulling up is always safe. The claim may not contain the area pulled from, but claims cannot stack.
+            if (isRetract && direction == BlockFace.UP) return;
+
+            // Pushing down is always safe. The claim may not contain the area pushed into, but claims cannot stack.
+            if (!isRetract && direction == BlockFace.DOWN) return;
+        }
+
+        // Assemble list of potentially intersecting claims from chunks interacted with.
+        ArrayList<Claim> intersectable = new ArrayList<>();
+        int chunkXMax = movedBlocks.getMaxX() >> 4;
+        int chunkZMax = movedBlocks.getMaxZ() >> 4;
+
+        for (int chunkX = movedBlocks.getMinX() >> 4; chunkX <= chunkXMax; ++chunkX)
+        {
+            for (int chunkZ = movedBlocks.getMinZ() >> 4; chunkZ <= chunkZMax; ++chunkZ)
+            {
+                ArrayList<Claim> chunkClaims = dataStore.chunksToClaimsMap.get(DataStore.getChunkHash(chunkX, chunkZ));
+                if (chunkClaims == null) continue;
+
+                for (Claim claim : chunkClaims)
+                {
+                    // Ensure claim is not piston claim and is in same world.
+                    if (pistonClaim != claim && pistonBlock.getWorld().equals(claim.getLesserBoundaryCorner().getWorld()))
+                        intersectable.add(claim);
+                }
+            }
+        }
+
+        BiPredicate<Claim, BoundingBox> intersectionHandler;
+        final Claim finalPistonClaim = pistonClaim;
+
+        // Fast mode: Bounding box intersection always causes a conflict, even if blocks do not conflict.
+        if (pistonMode == PistonMode.EVERYWHERE_SIMPLE)
+        {
+            intersectionHandler = (claim, claimBoundingBox) ->
+            {
+                // If owners are different, cancel.
+                if (finalPistonClaim == null || !Objects.equals(finalPistonClaim.getOwnerID(), claim.getOwnerID()))
+                {
+                    event.setCancelled(true);
+                    return true;
+                }
+
+                // Otherwise, proceed to next claim.
+                return false;
+            };
+        }
+        // Precise mode: Bounding box intersection may not yield a conflict. Individual blocks must be considered.
+        else
+        {
+            // Set up list of affected blocks.
+            HashSet<Block> checkBlocks = new HashSet<>(blocks);
+
+            // Add all blocks that will be occupied after the shift.
+            for (Block block : blocks)
+                if (block.getPistonMoveReaction() != PistonMoveReaction.BREAK)
+                    checkBlocks.add(block.getRelative(direction));
+
+            intersectionHandler = (claim, claimBoundingBox) ->
+            {
+                // Ensure that the claim contains an affected block.
+                if (checkBlocks.stream().noneMatch(claimBoundingBox::contains)) return false;
+
+                // If pushing this block will change ownership, cancel the event and take away the piston (for performance reasons).
+                if (finalPistonClaim == null || !Objects.equals(finalPistonClaim.getOwnerID(), claim.getOwnerID()))
+                {
+                    event.setCancelled(true);
+                    if (EterniaKamui.getBool(Booleans.PISTON_EXPLOSION_SOUND)) {
+                        pistonBlock.getWorld().createExplosion(pistonBlock.getLocation(), 0);
+                    }
+                    pistonBlock.getWorld().dropItem(pistonBlock.getLocation(), new ItemStack(event.isSticky() ? Material.STICKY_PISTON : Material.PISTON));
+                    pistonBlock.setType(Material.AIR);
+                    return true;
+                }
+
+                // Otherwise, proceed to next claim.
+                return false;
+            };
+        }
+
+        for (Claim claim : intersectable)
+        {
+            BoundingBox claimBoundingBox = new BoundingBox(claim);
+
+            // Ensure claim intersects with block bounding box.
+            if (!claimBoundingBox.intersects(movedBlocks)) continue;
+
+            // Do additional mode-based handling.
+            if (intersectionHandler.test(claim, claimBoundingBox)) return;
         }
     }
 
@@ -735,7 +772,7 @@ public class BlockEventHandler implements Listener {
         //where to?
         Block toBlock = spreadEvent.getToBlock();
         Location toLocation = toBlock.getLocation();
-        Claim toClaim = this.dataStore.getClaimAt(toLocation, false, lastSpreadClaim);
+        Claim toClaim = this.dataStore.getClaimAt(toLocation, lastSpreadClaim);
 
         //if into a land claim, it must be from the same land claim
         if (toClaim != null) {
@@ -745,9 +782,9 @@ public class BlockEventHandler implements Listener {
                 }
             }
             this.lastSpreadClaim = toClaim;
-            if (!toClaim.contains(spreadEvent.getBlock().getLocation(), false, true)) {
+            if (!toClaim.contains(spreadEvent.getBlock().getLocation(), true)) {
                 //exception: from parent into subdivision
-                if (toClaim.parent == null || !toClaim.parent.contains(spreadEvent.getBlock().getLocation(), false, false)) {
+                if (toClaim.parent == null || !toClaim.parent.contains(spreadEvent.getBlock().getLocation(), false)) {
                     spreadEvent.setCancelled(true);
                 }
             }
@@ -767,7 +804,7 @@ public class BlockEventHandler implements Listener {
         if (EterniaKamui.instance.creativeRulesApply(location)) {
             Material type = block.getType();
             if (type == Material.COBBLESTONE || type == Material.OBSIDIAN || type == Material.LAVA || type == Material.WATER) {
-                Claim claim = EterniaKamui.instance.dataStore.getClaimAt(location, false, null);
+                Claim claim = EterniaKamui.instance.dataStore.getClaimAt(location, null);
                 if (claim == null) {
                     event.setCancelled(true);
                 }
@@ -786,7 +823,7 @@ public class BlockEventHandler implements Listener {
 
         Block block = event.getHitBlock();
 
-        Claim claim = dataStore.getClaimAt(block.getLocation(), false, null);
+        Claim claim = dataStore.getClaimAt(block.getLocation(), null);
         if (claim == null)
             return;
 
@@ -825,8 +862,8 @@ public class BlockEventHandler implements Listener {
 
         //to where?
         Block toBlock = fromBlock.getRelative(dispenser.getFacing());
-        Claim fromClaim = this.dataStore.getClaimAt(fromBlock.getLocation(), false, null);
-        Claim toClaim = this.dataStore.getClaimAt(toBlock.getLocation(), false, fromClaim);
+        Claim fromClaim = this.dataStore.getClaimAt(fromBlock.getLocation(), null);
+        Claim toClaim = this.dataStore.getClaimAt(toBlock.getLocation(), fromClaim);
 
         //into wilderness is NOT OK in creative mode worlds
         Material materialDispensed = dispenseEvent.getItem().getType();
@@ -854,7 +891,7 @@ public class BlockEventHandler implements Listener {
         if (!EterniaKamui.instance.claimsEnabledForWorld(growEvent.getWorld())) return;
 
         Location rootLocation = growEvent.getLocation();
-        Claim rootClaim = this.dataStore.getClaimAt(rootLocation, false, null);
+        Claim rootClaim = this.dataStore.getClaimAt(rootLocation, null);
         String rootOwnerName = null;
 
         //who owns the spreading block, if anyone?
@@ -872,7 +909,7 @@ public class BlockEventHandler implements Listener {
         //for each block growing
         for (int i = 0; i < growEvent.getBlocks().size(); i++) {
             BlockState block = growEvent.getBlocks().get(i);
-            Claim blockClaim = this.dataStore.getClaimAt(block.getLocation(), false, rootClaim);
+            Claim blockClaim = this.dataStore.getClaimAt(block.getLocation(), rootClaim);
 
             //if it's growing into a claim
             if (blockClaim != null) {

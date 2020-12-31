@@ -32,7 +32,7 @@ class WorldGuardWrapper {
 
             RegionManager manager = platform.getRegionContainer().get(world);
 
-            if (manager != null) {
+            if (manager != null && world != null) {
                 ProtectedCuboidRegion tempRegion = new ProtectedCuboidRegion(
                         "GP_TEMP",
                         BlockVector3.at(lesserCorner.getX(), 0, lesserCorner.getZ()),

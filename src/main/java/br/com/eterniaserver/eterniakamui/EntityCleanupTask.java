@@ -46,7 +46,7 @@ class EntityCleanupTask implements Runnable {
     public void run() {
         ArrayList<World> worlds = new ArrayList<>();
         for (World world : EterniaKamui.instance.getServer().getWorlds()) {
-            if (EterniaKamui.instance.config_claims_worldModes.get(world) == ClaimsMode.Creative) {
+            if (EterniaKamui.getClaimsWorldModes(world) == ClaimsMode.Creative) {
                 worlds.add(world);
             }
         }
@@ -87,7 +87,7 @@ class EntityCleanupTask implements Runnable {
 
                 //all non-player entities must be in claims
                 else if (!(entity instanceof Player)) {
-                    Claim claim = EterniaKamui.instance.dataStore.getClaimAt(entity.getLocation(), false, cachedClaim);
+                    Claim claim = EterniaKamui.instance.dataStore.getClaimAt(entity.getLocation(), cachedClaim);
                     if (claim != null) {
                         cachedClaim = claim;
                     } else {

@@ -48,15 +48,8 @@ class CleanupUnusedClaimPreTask implements Runnable {
             EterniaKamui.AddLogEntry("Player is online. Ignoring.", CustomLogEntryTypes.Debug, true);
             return;
         }
-        if (ownerInfo.getLastPlayed() <= 0) {
-            EterniaKamui.AddLogEntry("Player is new or not in the server's cached userdata. Ignoring. getLastPlayed = " + ownerInfo.getLastPlayed(), CustomLogEntryTypes.Debug, true);
-            return;
-        }
-
-        //skip claims belonging to exempted players based on block totals in config
-        int bonusBlocks = ownerData.getBonusClaimBlocks();
-        if (bonusBlocks >= EterniaKamui.instance.config_claims_expirationExemptionBonusBlocks || bonusBlocks + ownerData.getAccruedClaimBlocks() >= EterniaKamui.instance.config_claims_expirationExemptionTotalBlocks) {
-            EterniaKamui.AddLogEntry("Player exempt from claim expiration based on claim block counts vs. config file settings.", CustomLogEntryTypes.Debug, true);
+        if (ownerInfo.getLastSeen() <= 0) {
+            EterniaKamui.AddLogEntry("Player is new or not in the server's cached userdata. Ignoring. getLastPlayed = " + ownerInfo.getLastSeen(), CustomLogEntryTypes.Debug, true);
             return;
         }
 

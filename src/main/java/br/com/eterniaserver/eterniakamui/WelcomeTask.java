@@ -29,25 +29,21 @@ public class WelcomeTask implements Runnable {
             ItemFactory factory = Bukkit.getItemFactory();
             BookMeta meta = (BookMeta) factory.getItemMeta(Material.WRITTEN_BOOK);
 
-            DataStore datastore = EterniaKamui.instance.dataStore;
-            meta.setAuthor(datastore.getMessage(Messages.BookAuthor));
-            meta.setTitle(datastore.getMessage(Messages.BookTitle));
+            meta.setAuthor(EterniaKamui.getMessage(Messages.BookAuthor));
+            meta.setTitle(EterniaKamui.getMessage(Messages.BookTitle));
 
             StringBuilder page1 = new StringBuilder();
-            String URL = datastore.getMessage(Messages.BookLink, DataStore.SURVIVAL_VIDEO_URL);
-            String intro = datastore.getMessage(Messages.BookIntro);
+            String URL = EterniaKamui.getMessage(Messages.BookLink, DataStore.SURVIVAL_VIDEO_URL);
+            String intro = EterniaKamui.getMessage(Messages.BookIntro);
 
             page1.append(URL).append("\n\n");
             page1.append(intro).append("\n\n");
             String editToolName = EterniaKamui.instance.config_claims_modificationTool.name().replace('_', ' ').toLowerCase();
             String infoToolName = EterniaKamui.instance.config_claims_investigationTool.name().replace('_', ' ').toLowerCase();
-            String configClaimTools = datastore.getMessage(Messages.BookTools, editToolName, infoToolName);
+            String configClaimTools = EterniaKamui.getMessage(Messages.BookTools, editToolName, infoToolName);
             page1.append(configClaimTools);
-            if (EterniaKamui.instance.config_claims_automaticClaimsForNewPlayersRadius < 0) {
-                page1.append(datastore.getMessage(Messages.BookDisabledChestClaims));
-            }
 
-            String page2 = datastore.getMessage(Messages.BookUsefulCommands) + "\n\n" +
+            String page2 = EterniaKamui.getMessage(Messages.BookUsefulCommands) + "\n\n" +
                     "/Trust /UnTrust /TrustList\n" +
                     "/ClaimsList\n" +
                     "/AbandonClaim\n\n" +

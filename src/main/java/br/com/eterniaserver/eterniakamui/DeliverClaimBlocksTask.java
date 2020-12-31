@@ -18,7 +18,8 @@
 
 package br.com.eterniaserver.eterniakamui;
 
-import br.com.eterniaserver.eterniakamui.api.events.AccrueClaimBlocksEvent;
+import br.com.eterniaserver.eterniakamui.enums.Integers;
+import br.com.eterniaserver.eterniakamui.events.AccrueClaimBlocksEvent;
 import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
 import org.bukkit.entity.Player;
 
@@ -35,7 +36,7 @@ class DeliverClaimBlocksTask implements Runnable {
     public DeliverClaimBlocksTask(Player player, EterniaKamui instance) {
         this.player = player;
         this.instance = instance;
-        this.idleThresholdSquared = instance.config_claims_accruedIdleThreshold * instance.config_claims_accruedIdleThreshold;
+        this.idleThresholdSquared = EterniaKamui.getInt(Integers.CLAIMS_ACCRUED_IDLE_THRESHOLD) * EterniaKamui.getInt(Integers.CLAIMS_ACCRUED_IDLE_THRESHOLD);
     }
 
     @Override
@@ -78,16 +79,16 @@ class DeliverClaimBlocksTask implements Runnable {
 
         try {
             //determine how fast blocks accrue for this player //RoboMWM: addons determine this instead
-            int accrualRate = instance.config_claims_blocksAccruedPerHour_default;
+            int accrualRate = EterniaKamui.getInt(Integers.CLAIMS_BLOCKS_ACCRUED_PER_HOUR);
 
             //determine idle accrual rate when idle
             if (isIdle) {
-                if (instance.config_claims_accruedIdlePercent <= 0) {
+                if (EterniaKamui.getInt(Integers.CLAIMS_ACCRUED_IDLE_PERCENT) <= 0) {
                     EterniaKamui.AddLogEntry(player.getName() + " wasn't active enough to accrue claim blocks this round.", CustomLogEntryTypes.Debug, true);
                     return; //idle accrual percentage is disabled
                 }
 
-                accrualRate = (int) (accrualRate * (instance.config_claims_accruedIdlePercent / 100.0D));
+                accrualRate = (int) (accrualRate * (EterniaKamui.getInt(Integers.CLAIMS_ACCRUED_IDLE_PERCENT) / 100.0D));
             }
 
             //fire event for addons

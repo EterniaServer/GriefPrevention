@@ -8,10 +8,6 @@ More Locks
 
 Many have asked for wooden doors, trap doors, and fence gates to require /AccessTrust.  I've insisted that because players generally expect these to be openable (based on the Vanilla experience), players should just "earn" their privacy by finding some iron and building an iron door.  Nonetheless, some folks definitely want this.
 
-Claim Flags
-
-Sometimes, folks want to add special flags to their claims like "no monsters spawn here".  They can do this today by adding other plugins like WorldGuard, which are compatible with GriefPrevention, but it would be nice if they could just use one plugin (and an extension).  I think their flag ideas come mostly from Residence and WorldGuard, so you can look there for ideas.
-
 Claim Entry/Exit Messages
 
 I keep telling people NO, I won't do this because it's not anti-grief-related and it's expensive to constantly track player movement.  But folks want it, and they keep asking for it.  You could build an extension which adds some slash commands for naming claims, and displays enter/exit messages as players walk around.

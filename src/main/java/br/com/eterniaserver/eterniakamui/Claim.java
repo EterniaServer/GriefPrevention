@@ -20,6 +20,8 @@ package br.com.eterniaserver.eterniakamui;
 
 import br.com.eterniaserver.eterniakamui.enums.ClaimPermission;
 import br.com.eterniaserver.eterniakamui.enums.Messages;
+import br.com.eterniaserver.eterniakamui.util.BoundingBox;
+
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -54,7 +56,7 @@ public class Claim {
     public Date modifiedDate;
 
     //id number.  unique to this claim, never changes.
-    Long id = null;
+    Long id;
 
     //ownerID.  for admin claims, this is NULL
     //use getOwnerName() to get a friendly name (will be "an administrator" for admin claims)
@@ -79,14 +81,11 @@ public class Claim {
     public Claim parent = null;
 
     // intended for subclaims - they inherit no permissions
-    private boolean inheritNothing = false;
+    private boolean inheritNothing;
 
     //children (subdivisions)
     //note subdivisions themselves never have children
     public ArrayList<Claim> children = new ArrayList<>();
-
-    //information about a siege involving this claim.  null means no siege is impacting this claim
-    public SiegeData siegeData = null;
 
     //following a siege, buttons/levers are unlocked temporarily.  this represents that state
     public boolean doorsOpen = false;
@@ -102,20 +101,6 @@ public class Claim {
     //accessor for ID
     public Long getID() {
         return this.id;
-    }
-
-    //basic constructor, just notes the creation time
-    //see above declarations for other defaults
-    Claim() {
-        this.modifiedDate = Calendar.getInstance().getTime();
-    }
-
-    //players may only siege someone when he's not in an admin claim
-    //and when he has some level of permission in the claim
-    public boolean canSiege(Player defender) {
-        if (this.isAdminClaim()) return false;
-
-        return this.allowAccess(defender) == null;
     }
 
     //removes any lava above sea level in a claim
@@ -147,7 +132,7 @@ public class Claim {
                 for (int y = seaLevel - 1; y <= lesser.getWorld().getMaxHeight(); y++) {
                     //dodge the exclusion claim
                     Block block = lesser.getWorld().getBlockAt(x, y, z);
-                    if (exclusionClaim != null && exclusionClaim.contains(block.getLocation(), true, false)) continue;
+                    if (exclusionClaim != null && exclusionClaim.contains(block.getLocation(), false)) continue;
 
                     if (block.getType() == Material.LAVA || block.getType() == Material.WATER) {
                         block.setType(Material.AIR);
@@ -156,38 +141,6 @@ public class Claim {
             }
         }
     }
-
-    //determines whether or not a claim has surface lava
-    //used to warn players when they abandon their claims about automatic fluid cleanup
-    boolean hasSurfaceFluids() {
-        Location lesser = this.getLesserBoundaryCorner();
-        Location greater = this.getGreaterBoundaryCorner();
-
-        //don't bother for very large claims, too expensive
-        if (this.getArea() > 10000) return false;
-
-        int seaLevel = 0;  //clean up all fluids in the end
-
-        //respect sea level in normal worlds
-        if (lesser.getWorld().getEnvironment() == Environment.NORMAL)
-            seaLevel = EterniaKamui.instance.getSeaLevel(lesser.getWorld());
-
-        for (int x = lesser.getBlockX(); x <= greater.getBlockX(); x++) {
-            for (int z = lesser.getBlockZ(); z <= greater.getBlockZ(); z++) {
-                for (int y = seaLevel - 1; y <= lesser.getWorld().getMaxHeight(); y++) {
-                    //dodge the exclusion claim
-                    Block block = lesser.getWorld().getBlockAt(x, y, z);
-
-                    if (block.getType() == Material.WATER || block.getType() == Material.LAVA) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
-    }
-
     //main constructor.  note that only creating a claim instance does nothing - a claim must be added to the data store to be effective
     Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, boolean inheritNothing, Long id) {
         //modification date
@@ -243,7 +196,6 @@ public class Claim {
         this.parent = claim.parent;
         this.inheritNothing = claim.inheritNothing;
         this.children = new ArrayList<>(claim.children);
-        this.siegeData = claim.siegeData;
         this.doorsOpen = claim.doorsOpen;
     }
 
@@ -278,7 +230,7 @@ public class Claim {
                         new Location(this.greaterBoundaryCorner.getWorld(), this.greaterBoundaryCorner.getBlockX() + howNear, this.greaterBoundaryCorner.getBlockY(), this.greaterBoundaryCorner.getBlockZ() + howNear),
                         null, new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), null);
 
-        return claim.contains(location, false, true);
+        return claim.contains(location, true);
     }
 
     //permissions.  note administrative "public" claims have different rules than other claims
@@ -299,16 +251,6 @@ public class Claim {
             if (player.hasPermission("griefprevention.deleteclaims")) return null;
         }
 
-        //no resizing, deleting, and so forth while under siege
-        if (player.getUniqueId().equals(this.ownerID)) {
-            if (this.siegeData != null) {
-                return EterniaKamui.instance.dataStore.getMessage(Messages.NoModifyDuringSiege);
-            }
-
-            //otherwise, owners can do whatever
-            return null;
-        }
-
         //permission inheritance for subdivisions
         if (this.parent != null) {
             if (player.getUniqueId().equals(this.parent.ownerID))
@@ -318,7 +260,7 @@ public class Claim {
         }
 
         //error message if all else fails
-        return EterniaKamui.instance.dataStore.getMessage(Messages.OnlyOwnersModifyClaims, this.getOwnerName());
+        return EterniaKamui.getMessage(Messages.OnlyOwnersModifyClaims, this.getOwnerName());
     }
 
     private static final Set<Material> PLACEABLE_FARMING_BLOCKS = EnumSet.of(
@@ -339,23 +281,15 @@ public class Claim {
         //if we don't know who's asking, always say no (i've been told some mods can make this happen somehow)
         if (player == null) return "";
 
-        //when a player tries to build in a claim, if he's under siege, the siege may extend to include the new claim
-        EterniaKamui.instance.dataStore.tryExtendSiege(player, this);
-
         //admin claims can always be modified by admins, no exceptions
         if (this.isAdminClaim()) {
             if (player.hasPermission("griefprevention.adminclaims")) return null;
         }
 
-        //no building while under siege
-        if (this.siegeData != null) {
-            return EterniaKamui.instance.dataStore.getMessage(Messages.NoBuildUnderSiege, this.siegeData.attacker.getName());
-        }
-
         //no building while in pvp combat
         PlayerData playerData = EterniaKamui.instance.dataStore.getPlayerData(player.getUniqueId());
         if (playerData.inPvpCombat()) {
-            return EterniaKamui.instance.dataStore.getMessage(Messages.NoBuildPvP);
+            return EterniaKamui.getMessage(Messages.NoBuildPvP);
         }
 
         //owners can make changes, or admins with ignore claims mode enabled
@@ -385,9 +319,9 @@ public class Claim {
         }
 
         //failure message for all other cases
-        String reason = EterniaKamui.instance.dataStore.getMessage(Messages.NoBuildPermission, this.getOwnerName());
+        String reason = EterniaKamui.getMessage(Messages.NoBuildPermission, this.getOwnerName());
         if (player.hasPermission("griefprevention.ignoreclaims"))
-            reason += "  " + EterniaKamui.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
+            reason += "  " + EterniaKamui.getMessage(Messages.IgnoreClaimsAdvertisement);
 
         return reason;
     }
@@ -420,20 +354,6 @@ public class Claim {
 
     //break permission check
     public String allowBreak(Player player, Material material) {
-        //if under siege, some blocks will be breakable
-        if (this.siegeData != null || this.doorsOpen) {
-            boolean breakable = EterniaKamui.instance.config_siege_blocks.contains(material);
-
-            //custom error messages for siege mode
-            if (!breakable) {
-                return EterniaKamui.instance.dataStore.getMessage(Messages.NonSiegeMaterial);
-            } else if (player.getUniqueId().equals(this.ownerID)) {
-                return EterniaKamui.instance.dataStore.getMessage(Messages.NoOwnerBuildUnderSiege);
-            } else {
-                return null;
-            }
-        }
-
         //if not under siege, build rules apply
         return this.allowBuild(player, material);
     }
@@ -467,9 +387,9 @@ public class Claim {
         }
 
         //catch-all error message for all other cases
-        String reason = EterniaKamui.instance.dataStore.getMessage(Messages.NoAccessPermission, this.getOwnerName());
+        String reason = EterniaKamui.getMessage(Messages.NoAccessPermission, this.getOwnerName());
         if (player.hasPermission("griefprevention.ignoreclaims"))
-            reason += "  " + EterniaKamui.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
+            reason += "  " + EterniaKamui.getMessage(Messages.IgnoreClaimsAdvertisement);
         return reason;
     }
 
@@ -477,14 +397,6 @@ public class Claim {
     public String allowContainers(Player player) {
         //if we don't know who's asking, always say no (i've been told some mods can make this happen somehow)
         if (player == null) return "";
-
-        //trying to access inventory in a claim may extend an existing siege to include this claim
-        EterniaKamui.instance.dataStore.tryExtendSiege(player, this);
-
-        //if under siege, nobody accesses containers
-        if (this.siegeData != null) {
-            return EterniaKamui.instance.dataStore.getMessage(Messages.NoContainersSiege, siegeData.attacker.getName());
-        }
 
         //owner and administrators in ignoreclaims mode have access
         if (player.getUniqueId().equals(this.ownerID) || EterniaKamui.instance.dataStore.getPlayerData(player.getUniqueId()).ignoreClaims)
@@ -510,9 +422,9 @@ public class Claim {
         }
 
         //error message for all other cases
-        String reason = EterniaKamui.instance.dataStore.getMessage(Messages.NoContainersPermission, this.getOwnerName());
+        String reason = EterniaKamui.getMessage(Messages.NoContainersPermission, this.getOwnerName());
         if (player.hasPermission("griefprevention.ignoreclaims"))
-            reason += "  " + EterniaKamui.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
+            reason += "  " + EterniaKamui.getMessage(Messages.IgnoreClaimsAdvertisement);
         return reason;
     }
 
@@ -544,18 +456,10 @@ public class Claim {
         }
 
         //generic error message
-        String reason = EterniaKamui.instance.dataStore.getMessage(Messages.NoPermissionTrust, this.getOwnerName());
+        String reason = EterniaKamui.getMessage(Messages.NoPermissionTrust, this.getOwnerName());
         if (player.hasPermission("griefprevention.ignoreclaims"))
-            reason += "  " + EterniaKamui.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
+            reason += "  " + EterniaKamui.getMessage(Messages.IgnoreClaimsAdvertisement);
         return reason;
-    }
-
-    public ClaimPermission getPermission(String playerID) {
-        if (playerID == null || playerID.isEmpty()) {
-            return null;
-        }
-
-        return this.playerIDToClaimPermissionMap.get(playerID.toLowerCase());
     }
 
     //grants a permission for a player or the public
@@ -622,7 +526,7 @@ public class Claim {
             return this.parent.getOwnerName();
 
         if (this.ownerID == null)
-            return EterniaKamui.instance.dataStore.getMessage(Messages.OwnerNameForAdminClaims);
+            return EterniaKamui.getMessage(Messages.OwnerNameForAdminClaims);
 
         return EterniaKamui.lookupPlayerName(this.ownerID);
     }
@@ -633,30 +537,24 @@ public class Claim {
 
     //whether or not a location is in a claim
     //ignoreHeight = true means location UNDER the claim will return TRUE
-    //excludeSubdivisions = true means that locations inside subdivisions of the claim will return FALSE
-    public boolean contains(Location location, boolean ignoreHeight, boolean excludeSubdivisions) {
+    //excludeSubdivisions = true means that lo'cations inside subdivisions of the claim will return FALSE
+    public boolean contains(Location location, boolean excludeSubdivisions) {
         //not in the same world implies false
-        if (!location.getWorld().equals(this.lesserBoundaryCorner.getWorld())) return false;
+        if (!Objects.equals(location.getWorld(), this.lesserBoundaryCorner.getWorld())) {
+            return false;
+        }
+        int x = location.getBlockX();
+        int z = location.getBlockZ();
+        int y = location.getBlockY();
 
-        double x = location.getX();
-        double y = location.getY();
-        double z = location.getZ();
-
-        //main check
-        boolean inClaim = (ignoreHeight || y >= this.lesserBoundaryCorner.getY()) &&
-                x >= this.lesserBoundaryCorner.getX() &&
-                x < this.greaterBoundaryCorner.getX() + 1 &&
-                z >= this.lesserBoundaryCorner.getZ() &&
-                z < this.greaterBoundaryCorner.getZ() + 1;
-
-        if (!inClaim) return false;
+        if (!new BoundingBox(this).contains(x, y, z)) return false;
 
         //additional check for subdivisions
         //you're only in a subdivision when you're also in its parent claim
         //NOTE: if a player creates subdivions then resizes the parent claim, it's possible that
         //a subdivision can reach outside of its parent's boundaries.  so this check is important!
         if (this.parent != null) {
-            return this.parent.contains(location, ignoreHeight, false);
+            return this.parent.contains(location, false);
         }
 
         //code to exclude subdivisions in this check
@@ -664,7 +562,7 @@ public class Claim {
             //search all subdivisions to see if the location is in any of them
             for (Claim child : this.children) {
                 //if we find such a subdivision, return false
-                if (child.contains(location, ignoreHeight, true)) {
+                if (child.contains(location, true)) {
                     return false;
                 }
             }
@@ -677,15 +575,10 @@ public class Claim {
     //whether or not two claims overlap
     //used internally to prevent overlaps when creating claims
     boolean overlaps(Claim otherClaim) {
-        // For help visualizing test cases, try https://silentmatt.com/rectangle-intersection/
-
-        if (!this.lesserBoundaryCorner.getWorld().equals(otherClaim.getLesserBoundaryCorner().getWorld())) return false;
-
-        return !(this.getGreaterBoundaryCorner().getX() < otherClaim.getLesserBoundaryCorner().getX() ||
-                this.getLesserBoundaryCorner().getX() > otherClaim.getGreaterBoundaryCorner().getX() ||
-                this.getGreaterBoundaryCorner().getZ() < otherClaim.getLesserBoundaryCorner().getZ() ||
-                this.getLesserBoundaryCorner().getZ() > otherClaim.getGreaterBoundaryCorner().getZ());
-
+        if (!Objects.equals(this.lesserBoundaryCorner.getWorld(), otherClaim.getLesserBoundaryCorner().getWorld())) {
+            return false;
+        }
+        return new BoundingBox(this).intersects(new BoundingBox(otherClaim));
     }
 
     //whether more entities may be added to a claim
@@ -703,7 +596,7 @@ public class Claim {
 
         //determine maximum allowable entity count, based on claim size
         int maxEntities = this.getArea() / 50;
-        if (maxEntities == 0) return EterniaKamui.instance.dataStore.getMessage(Messages.ClaimTooSmallForEntities);
+        if (maxEntities == 0) return EterniaKamui.getMessage(Messages.ClaimTooSmallForEntities);
 
         //count current entities (ignoring players)
         int totalEntities = 0;
@@ -711,7 +604,7 @@ public class Claim {
         for (Chunk chunk : chunks) {
             Entity[] entities = chunk.getEntities();
             for (Entity entity : entities) {
-                if (!(entity instanceof Player) && this.contains(entity.getLocation(), false, false)) {
+                if (!(entity instanceof Player) && this.contains(entity.getLocation(), false)) {
                     totalEntities++;
                     if (remove && totalEntities > maxEntities) entity.remove();
                 }
@@ -719,7 +612,7 @@ public class Claim {
         }
 
         if (totalEntities >= maxEntities)
-            return EterniaKamui.instance.dataStore.getMessage(Messages.TooManyEntitiesInClaim);
+            return EterniaKamui.getMessage(Messages.TooManyEntitiesInClaim);
 
         return null;
     }
@@ -730,7 +623,7 @@ public class Claim {
         //determine maximum allowable entity count, based on claim size
         int maxActives = this.getArea() / 100;
         if (maxActives == 0)
-            return EterniaKamui.instance.dataStore.getMessage(Messages.ClaimTooSmallForActiveBlocks);
+            return EterniaKamui.getMessage(Messages.ClaimTooSmallForActiveBlocks);
 
         //count current actives
         int totalActives = 0;
@@ -739,7 +632,7 @@ public class Claim {
             BlockState[] actives = chunk.getTileEntities();
             for (BlockState active : actives) {
                 if (BlockEventHandler.isActiveBlock(active)) {
-                    if (this.contains(active.getLocation(), false, false)) {
+                    if (this.contains(active.getLocation(), false)) {
                         totalActives++;
                     }
                 }
@@ -747,27 +640,10 @@ public class Claim {
         }
 
         if (totalActives >= maxActives)
-            return EterniaKamui.instance.dataStore.getMessage(Messages.TooManyActiveBlocksInClaim);
+            return EterniaKamui.getMessage(Messages.TooManyActiveBlocksInClaim);
 
         return null;
     }
-
-    //implements a strict ordering of claims, used to keep the claims collection sorted for faster searching
-    boolean greaterThan(Claim otherClaim) {
-        Location thisCorner = this.getLesserBoundaryCorner();
-        Location otherCorner = otherClaim.getLesserBoundaryCorner();
-
-        if (thisCorner.getBlockX() > otherCorner.getBlockX()) return true;
-
-        if (thisCorner.getBlockX() < otherCorner.getBlockX()) return false;
-
-        if (thisCorner.getBlockZ() > otherCorner.getBlockZ()) return true;
-
-        if (thisCorner.getBlockZ() < otherCorner.getBlockZ()) return false;
-
-        return thisCorner.getWorld().getName().compareTo(otherCorner.getWorld().getName()) < 0;
-    }
-
 
     long getPlayerInvestmentScore() {
         //decide which blocks will be considered player placed

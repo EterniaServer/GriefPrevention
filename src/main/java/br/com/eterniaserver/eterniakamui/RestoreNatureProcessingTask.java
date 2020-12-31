@@ -18,13 +18,13 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.objects.BlockSnapshot;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.World.Environment;
 import org.bukkit.block.Biome;
 import org.bukkit.block.data.Levelled;
-import org.bukkit.block.data.type.Leaves;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
@@ -155,22 +155,6 @@ class RestoreNatureProcessingTask implements Runnable {
         //schedule main thread task to apply the result to the world
         RestoreNatureExecutionTask task = new RestoreNatureExecutionTask(this.snapshots, this.miny, this.lesserBoundaryCorner, this.greaterBoundaryCorner, this.player);
         EterniaKamui.instance.getServer().getScheduler().scheduleSyncDelayedTask(EterniaKamui.instance, task);
-    }
-
-
-    private void removePlayerLeaves() {
-        if (this.seaLevel < 1) return;
-
-        for (int x = 1; x < snapshots.length - 1; x++) {
-            for (int z = 1; z < snapshots[0][0].length - 1; z++) {
-                for (int y = this.seaLevel - 1; y < snapshots[0].length; y++) {
-                    BlockSnapshot block = snapshots[x][y][z];
-                    if (Tag.LEAVES.isTagged(block.typeId) && ((Leaves) block.data).isPersistent()) {
-                        block.typeId = Material.AIR;
-                    }
-                }
-            }
-        }
     }
 
     //converts sandstone adjacent to sand to sand, and any other sandstone to air
@@ -442,78 +426,6 @@ class RestoreNatureProcessingTask implements Runnable {
             }
         } while (changed);
     }
-
-
-    private void fixWater() {
-        int miny = this.miny;
-        if (miny < 1) miny = 1;
-
-        boolean changed;
-
-        //remove hanging water or lava
-        for (int x = 1; x < snapshots.length - 1; x++) {
-            for (int z = 1; z < snapshots[0][0].length - 1; z++) {
-                for (int y = miny; y < snapshots[0].length - 1; y++) {
-                    BlockSnapshot block = this.snapshots[x][y][z];
-                    BlockSnapshot underBlock = this.snapshots[x][y--][z];
-                    if (block.typeId == Material.WATER || block.typeId == Material.LAVA) {
-                        // check if block below is air or is a non-source fluid block (level 1-7 = flowing, 8 = falling)
-                        if (underBlock.typeId == Material.AIR || (underBlock.typeId == Material.WATER && (((Levelled) underBlock.data).getLevel() != 0))) {
-                            block.typeId = Material.AIR;
-                        }
-                    }
-                }
-            }
-        }
-
-        //fill water depressions
-        do {
-            changed = false;
-            for (int y = Math.max(this.seaLevel - 10, 0); y <= this.seaLevel; y++) {
-                for (int x = 1; x < snapshots.length - 1; x++) {
-                    for (int z = 1; z < snapshots[0][0].length - 1; z++) {
-                        BlockSnapshot block = snapshots[x][y][z];
-
-                        //only consider air blocks and flowing water blocks for upgrade to water source blocks
-                        if (block.typeId == Material.AIR || (block.typeId == Material.WATER && ((Levelled) block.data).getLevel() != 0)) {
-                            BlockSnapshot leftBlock = this.snapshots[x + 1][y][z];
-                            BlockSnapshot rightBlock = this.snapshots[x - 1][y][z];
-                            BlockSnapshot upBlock = this.snapshots[x][y][z + 1];
-                            BlockSnapshot downBlock = this.snapshots[x][y][z - 1];
-                            BlockSnapshot underBlock = this.snapshots[x][y - 1][z];
-
-                            //block underneath MUST be source water
-                            if (!(underBlock.typeId == Material.WATER && ((Levelled) underBlock.data).getLevel() == 0))
-                                continue;
-
-                            //count adjacent source water blocks
-                            byte adjacentSourceWaterCount = 0;
-                            if (leftBlock.typeId == Material.WATER && ((Levelled) leftBlock.data).getLevel() == 0) {
-                                adjacentSourceWaterCount++;
-                            }
-                            if (rightBlock.typeId == Material.WATER && ((Levelled) rightBlock.data).getLevel() == 0) {
-                                adjacentSourceWaterCount++;
-                            }
-                            if (upBlock.typeId == Material.WATER && ((Levelled) upBlock.data).getLevel() == 0) {
-                                adjacentSourceWaterCount++;
-                            }
-                            if (downBlock.typeId == Material.WATER && ((Levelled) downBlock.data).getLevel() == 0) {
-                                adjacentSourceWaterCount++;
-                            }
-
-                            //at least two adjacent blocks must be source water
-                            if (adjacentSourceWaterCount >= 2) {
-                                block.typeId = Material.WATER;
-                                ((Levelled) downBlock.data).setLevel(0);
-                                changed = true;
-                            }
-                        }
-                    }
-                }
-            }
-        } while (changed);
-    }
-
 
     private void removeDumpedFluids() {
         if (this.seaLevel < 1) return;

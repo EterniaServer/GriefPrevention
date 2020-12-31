@@ -18,7 +18,7 @@
 
 package br.com.eterniaserver.eterniakamui;
 
-import br.com.eterniaserver.eterniakamui.api.events.VisualizationEvent;
+import br.com.eterniaserver.eterniakamui.events.VisualizationEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 

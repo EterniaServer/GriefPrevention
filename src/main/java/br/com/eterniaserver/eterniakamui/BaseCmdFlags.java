@@ -4,7 +4,9 @@ import br.com.eterniaserver.acf.BaseCommand;
 import br.com.eterniaserver.acf.annotation.CommandAlias;
 import br.com.eterniaserver.acf.annotation.CommandPermission;
 import br.com.eterniaserver.acf.annotation.Description;
+import br.com.eterniaserver.eterniakamui.*;
 import br.com.eterniaserver.eterniakamui.enums.Messages;
+import br.com.eterniaserver.eterniakamui.objects.ClaimFlag;
 import br.com.eterniaserver.eternialib.SQL;
 import br.com.eterniaserver.eternialib.sql.queries.Insert;
 
@@ -33,10 +35,7 @@ public class BaseCmdFlags extends BaseCommand {
 
     public BaseCmdFlags() {
 
-        try (Connection connection = SQL.getConnection()) {
-            PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM ek_flags;");
-            preparedStatement.execute();
-            ResultSet resultSet = preparedStatement.getResultSet();
+        try (Connection connection = SQL.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM ek_flags;"); ResultSet resultSet = preparedStatement.executeQuery()) {
             while (resultSet.next()) {
                 ClaimFlag claimFlag = new ClaimFlag();
                 claimFlag.setAllowPvP(resultSet.getInt("pvp"));
@@ -44,13 +43,8 @@ public class BaseCmdFlags extends BaseCommand {
                 claimFlag.setExplosions(resultSet.getInt("explosions"));
                 claimFlag.setKeepLevel(resultSet.getInt("keeplevel"));
                 claimFlag.setLiquidFluid(resultSet.getInt("fluid"));
-                claimFlag.setEnterMessage(resultSet.getString("enterm"));
-                claimFlag.setExitMessage(resultSet.getString("exitm"));
                 PluginVars.claimFlags.put(resultSet.getLong("claimid"), claimFlag);
             }
-            resultSet.close();
-            preparedStatement.close();
-
         } catch (SQLException exception) {
             exception.printStackTrace();
         }
@@ -136,15 +130,15 @@ public class BaseCmdFlags extends BaseCommand {
     @CommandPermission("eternia.claim.user")
     @Description(" Altere as flags do terreno")
     public void onFlag(Player player) {
-        Claim claim = EterniaKamui.instance.dataStore.getClaimAt(player.getLocation(), true, null);
+        Claim claim = EterniaKamui.instance.dataStore.getClaimAt(player.getLocation(), null);
         if (claim != null) {
             if (claim.getOwnerName().equals(player.getName()) || player.hasPermission("eternia.admin")) {
                 openFlags(claim, player);
             } else {
-                EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoOwner);
+                EterniaKamui.sendMessage(player, Messages.NoOwner);
             }
         } else {
-            EterniaKamui.sendMessage(player, TextMode.Err, Messages.NoClaim);
+            EterniaKamui.sendMessage(player, Messages.NoClaim);
         }
     }
 

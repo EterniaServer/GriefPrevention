@@ -1,6 +1,8 @@
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.configurations.configs.TableCfg;
 import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
+import br.com.eterniaserver.eternialib.SQL;
 import br.com.eterniaserver.eternialib.UUIDFetcher;
 
 import org.bukkit.Bukkit;
@@ -11,329 +13,262 @@ import org.bukkit.World;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Properties;
-import java.util.UUID;
+import java.util.*;
 
 //manages data stored in the file system
 public class DatabaseDataStore extends DataStore {
-    private Connection databaseConnection = null;
 
-    private final String databaseUrl;
-    private final String userName;
-    private final String password;
+    private static final String SQL_UPDATE_NAME =
+            "UPDATE ek_playerdata SET name = ? WHERE name = ?";
+    private static final String SQL_INSERT_CLAIM =
+            "INSERT INTO ek_claimdata (id, owner, lessercorner, greatercorner, builders, containers, accessors, managers, inheritnothing, parentid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    private static final String SQL_DELETE_CLAIM =
+            "DELETE FROM ek_claimdata WHERE id = ?";
+    private static final String SQL_SELECT_PLAYER_DATA =
+            "SELECT * FROM ek_playerdata WHERE name = ?";
+    private static final String SQL_DELETE_PLAYER_DATA =
+            "DELETE FROM ek_playerdata WHERE name = ?";
+    private static final String SQL_INSERT_PLAYER_DATA =
+            "INSERT INTO ek_playerdata (name, lastlogin, accruedblocks, bonusblocks) VALUES (?, ?, ?, ?)";
+    private static final String SQL_SET_NEXT_CLAIM_ID =
+            "INSERT INTO ek_nextclaimid VALUES (?)";
+    private static final String SQL_DELETE_GROUP_DATA =
+            "DELETE FROM ek_playerdata WHERE name = ?";
+    private static final String SQL_INSERT_SCHEMA_VERSION =
+            "INSERT INTO ek_schemaversion VALUES (?)";
+    private static final String SQL_DELETE_NEXT_CLAIM_ID =
+            "DELETE FROM ek_nextclaimid";
+    private static final String SQL_DELETE_SCHEMA_VERSION =
+            "DELETE FROM ek_schemaversion";
+    private static final String SQL_SELECT_SCHEMA_VERSION =
+            "SELECT * FROM ek_schemaversion";
 
-    private String updateNameSQL;
-    private String insertClaimSQL;
-    private String deleteClaimSQL;
-    private String getPlayerDataSQL;
-    private String deletePlayerDataSQL;
-    private String insertPlayerDataSQL;
-    private String insertNextClaimIdSQL;
-    private String deleteGroupBonusSQL;
-    private String insertSchemaVerSQL;
-    private String deleteNextClaimIdSQL;
-    private String deleteSchemaVersionSQL;
-    private String selectSchemaVersionSQL;
-
-    DatabaseDataStore(String url, String userName, String password) throws Exception {
-        this.databaseUrl = url;
-        this.userName = userName;
-        this.password = password;
-
+    DatabaseDataStore() throws Exception {
         this.initialize();
     }
 
     @Override
     void initialize() throws Exception {
-        try {
-            //load the java driver for mySQL
-            Class.forName("com.mysql.jdbc.Driver");
-        } catch (Exception e) {
-            EterniaKamui.AddLogEntry("ERROR: Unable to load Java's mySQL database driver.  Check to make sure you've installed it properly.");
-            throw e;
-        }
+        new TableCfg();
 
-        try {
-            this.refreshDataConnection();
-        } catch (Exception e2) {
-            EterniaKamui.AddLogEntry("ERROR: Unable to connect to database.  Check your config file settings.");
-            throw e2;
-        }
-
-        try {
-            //ensure the data tables exist
-            Statement statement = databaseConnection.createStatement();
-
-            statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_nextclaimid (nextid INT(15));");
-
-            statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_claimdata (id INT(15), owner VARCHAR(50), lessercorner VARCHAR(100), greatercorner VARCHAR(100), builders TEXT, containers TEXT, accessors TEXT, managers TEXT, inheritnothing BOOLEAN, parentid INT(15));");
-
-            statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_playerdata (name VARCHAR(50), lastlogin DATETIME, accruedblocks INT(15), bonusblocks INT(15));");
-
-            statement.execute("CREATE TABLE IF NOT EXISTS griefprevention_schemaversion (version INT(15));");
-
-            statement.execute("ALTER TABLE griefprevention_claimdata MODIFY builders TEXT;");
-            statement.execute("ALTER TABLE griefprevention_claimdata MODIFY containers TEXT;");
-            statement.execute("ALTER TABLE griefprevention_claimdata MODIFY accessors TEXT;");
-            statement.execute("ALTER TABLE griefprevention_claimdata MODIFY managers TEXT;");
-
-            //if the next claim id table is empty, this is a brand new database which will write using the latest schema
-            //otherwise, schema version is determined by schemaversion table (or =0 if table is empty, see getSchemaVersion())
-            ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_nextclaimid;");
-            if (!results.next()) {
+        try (Connection connection = SQL.getConnection();
+             ResultSet resultSet = connection.prepareStatement("SELECT * FROM ek_nextclaimid;").executeQuery()) {
+            if (!resultSet.next()) {
                 this.setSchemaVersion(latestSchemaVersion);
             }
-        } catch (Exception e3) {
-            EterniaKamui.AddLogEntry("ERROR: Unable to create the necessary database table.  Details:");
-            EterniaKamui.AddLogEntry(e3.getMessage());
-            e3.printStackTrace();
-            throw e3;
+        } catch (SQLException exception) {
+            EterniaKamui.AddLogEntry("Não foi possivel criar o arquivo necessário na database:");
+            EterniaKamui.AddLogEntry(exception.getMessage());
         }
-
-        this.updateNameSQL = "UPDATE griefprevention_playerdata SET name = ? WHERE name = ?;";
-        this.insertClaimSQL = "INSERT INTO griefprevention_claimdata (id, owner, lessercorner, greatercorner, builders, containers, accessors, managers, inheritnothing, parentid) VALUES(?,?,?,?,?,?,?,?,?,?);";
-        this.deleteClaimSQL = "DELETE FROM griefprevention_claimdata WHERE id=?;";
-        this.getPlayerDataSQL = "SELECT * FROM griefprevention_playerdata WHERE name=?;";
-        this.deletePlayerDataSQL = "DELETE FROM griefprevention_playerdata WHERE name=?;";
-        this.insertPlayerDataSQL = "INSERT INTO griefprevention_playerdata (name, lastlogin, accruedblocks, bonusblocks) VALUES (?,?,?,?);";
-        this.insertNextClaimIdSQL = "INSERT INTO griefprevention_nextclaimid VALUES (?);";
-        this.deleteGroupBonusSQL = "DELETE FROM griefprevention_playerdata WHERE name=?;";
-        this.insertSchemaVerSQL = "INSERT INTO griefprevention_schemaversion VALUES (?)";
-        this.deleteNextClaimIdSQL = "DELETE FROM griefprevention_nextclaimid;";
-        this.deleteSchemaVersionSQL = "DELETE FROM griefprevention_schemaversion;";
-        this.selectSchemaVersionSQL = "SELECT * FROM griefprevention_schemaversion;";
 
         //load group data into memory
-        Statement statement = databaseConnection.createStatement();
-        ResultSet results = statement.executeQuery("SELECT * FROM griefprevention_playerdata;");
+        try (Connection connection = SQL.getConnection();
+             ResultSet resultSet = connection.prepareStatement("SELECT * FROM ek_playerdata;").executeQuery()) {
+            while (resultSet.next()) {
+                String name = resultSet.getString("name");
 
-        while (results.next()) {
-            String name = results.getString("name");
+                //ignore non-groups.  all group names start with a dollar sign.
+                if (!name.startsWith("$")) continue;
 
-            //ignore non-groups.  all group names start with a dollar sign.
-            if (!name.startsWith("$")) continue;
+                String groupName = name.substring(1);
+                if (groupName == null || groupName.isEmpty()) continue;  //defensive coding, avoid unlikely cases
 
-            String groupName = name.substring(1);
-            if (groupName == null || groupName.isEmpty()) continue;  //defensive coding, avoid unlikely cases
+                int groupBonusBlocks = resultSet.getInt("bonusblocks");
 
-            int groupBonusBlocks = results.getInt("bonusblocks");
-
-            this.permissionToBonusBlocksMap.put(groupName, groupBonusBlocks);
+                this.permissionToBonusBlocksMap.put(groupName, groupBonusBlocks);
+            }
+        } catch (SQLException exception) {
+            EterniaKamui.AddLogEntry("Não foi possível carregar a database dos jogadores:");
+            EterniaKamui.AddLogEntry(exception.getMessage());
         }
 
-        //load next claim number into memory
-        results = statement.executeQuery("SELECT * FROM griefprevention_nextclaimid;");
+        try (Connection connection = SQL.getConnection();
+             ResultSet resultSet = connection.prepareStatement("SELECT * FROM ek_nextclaimid;").executeQuery()) {
 
-        //if there's nothing yet, add it
-        if (!results.next()) {
-            statement.execute("INSERT INTO griefprevention_nextclaimid VALUES(0);");
-            this.nextClaimID = (long) 0;
-        }
-
-        //otherwise load it
-        else {
-            this.nextClaimID = results.getLong("nextid");
+            if (!resultSet.next()) {
+                connection.prepareStatement("INSERT INTO ek_nextclaimid VALUES(0);").execute();
+                this.nextClaimID = 0L;
+            } else {
+                this.nextClaimID = resultSet.getLong("nextid");
+            }
+        } catch (SQLException exception) {
+            EterniaKamui.AddLogEntry("Não foi possível carregar o id do próximo claim, detalhes:");
+            EterniaKamui.AddLogEntry(exception.getMessage());
         }
 
         if (this.getSchemaVersion() == 0) {
-            try {
-                this.refreshDataConnection();
+            try (Connection connection = SQL.getConnection();
+                 ResultSet resultSet = connection.prepareStatement("SELECT * FROM ek_playerdata;").executeQuery()) {
+                Map<String, UUID> changes = new HashMap<>();
+                List<String> namesToConvert = new ArrayList<>();
 
-                //pull ALL player data from the database
-                statement = this.databaseConnection.createStatement();
-                results = statement.executeQuery("SELECT * FROM griefprevention_playerdata;");
-
-                //make a list of changes to be made
-                HashMap<String, UUID> changes = new HashMap<>();
-
-                ArrayList<String> namesToConvert = new ArrayList<>();
-                while (results.next()) {
+                while (resultSet.next()) {
                     //get the id
-                    String playerName = results.getString("name");
+                    String playerName = resultSet.getString("name");
 
                     //add to list of names to convert to UUID
                     namesToConvert.add(playerName);
                 }
 
-
-                //reset results cursor
-                results.beforeFirst();
-
-                //for each result
-                while (results.next()) {
-                    //get the id
-                    String playerName = results.getString("name");
-
-                    //try to convert player name to UUID
-                    try {
-                        UUID playerID = UUIDFetcher.getUUIDOf(playerName);
-
-                        //if successful, update the playerdata row by replacing the player's name with the player's UUID
-                        if (playerID != null) {
-                            changes.put(playerName, playerID);
-                        }
-                    }
-                    //otherwise leave it as-is. no harm done - it won't be requested by name, and this update only happens once.
-                    catch (Exception ignored) {
-                    }
+                for (String playerName : namesToConvert) {
+                    UUIDFetcher.getUUIDOf(playerName);
                 }
 
-                //refresh data connection in case data migration took a long time
-                this.refreshDataConnection();
+                resultSet.beforeFirst();
+
+                while (resultSet.next()) {
+                    String playerName = resultSet.getString("name");
+                    changes.put(playerName, UUIDFetcher.getUUIDOf(playerName));
+                }
 
                 for (String name : changes.keySet()) {
-                    try (PreparedStatement updateStmnt = this.databaseConnection.prepareStatement(this.getUpdateNameSQL())) {
+                    try (PreparedStatement updateStmnt = connection.prepareStatement(SQL_UPDATE_NAME)) {
                         updateStmnt.setString(1, changes.get(name).toString());
                         updateStmnt.setString(2, name);
                         updateStmnt.executeUpdate();
                     } catch (SQLException e) {
-                        EterniaKamui.AddLogEntry("Unable to convert player data for " + name + ".  Skipping.");
+                        EterniaKamui.AddLogEntry("Impossível de converter os arquivos de " + name + ".  Pulando.");
                         EterniaKamui.AddLogEntry(e.getMessage());
                     }
                 }
-            } catch (SQLException e) {
-                EterniaKamui.AddLogEntry("Unable to convert player data.  Details:");
-                EterniaKamui.AddLogEntry(e.getMessage());
-                e.printStackTrace();
+            } catch (SQLException exception) {
+                EterniaKamui.AddLogEntry("Não foi possível carregar os arquivos dos jogadores, detalhes:");
+                EterniaKamui.AddLogEntry(exception.getMessage());
+                exception.printStackTrace();
             }
         }
 
         if (this.getSchemaVersion() <= 2) {
-            statement = this.databaseConnection.createStatement();
-            statement.execute("ALTER TABLE griefprevention_claimdata ADD inheritNothing BOOLEAN DEFAULT 0 AFTER managers;");
+            try (Connection connection = SQL.getConnection()) {
+                connection.prepareStatement("ALTER TABLE ek_claimdata ADD inheritNothing BOOLEAN DEFAULT 0 AFTER managers;").execute();
+            } catch (SQLException exception) {
+                EterniaKamui.AddLogEntry("A database está fechada.");
+            }
         }
 
-        //load claims data into memory
+        try (Connection connection = SQL.getConnection(); ResultSet resultSet = connection.prepareStatement("SELECT * FROM ek_claimdata;").executeQuery()) {
+            List<Claim> claimsToRemove = new ArrayList<>();
+            List<Claim> subdivisionsToLoad = new ArrayList<>();
+            List<World> validWorlds = Bukkit.getServer().getWorlds();
 
-        results = statement.executeQuery("SELECT * FROM griefprevention_claimdata;");
-
-        ArrayList<Claim> claimsToRemove = new ArrayList<>();
-        ArrayList<Claim> subdivisionsToLoad = new ArrayList<>();
-        List<World> validWorlds = Bukkit.getServer().getWorlds();
-
-        long claimID;
-        while (results.next()) {
-            try {
-                //problematic claims will be removed from secondary storage, and never added to in-memory data store
-                boolean removeClaim = false;
-
-                long parentId = results.getLong("parentid");
-                claimID = results.getLong("id");
-                boolean inheritNothing = results.getBoolean("inheritNothing");
-                Location lesserBoundaryCorner;
-                Location greaterBoundaryCorner;
-                String lesserCornerString = "(location not available)";
+            long claimID;
+            while (resultSet.next()) {
                 try {
-                    lesserCornerString = results.getString("lessercorner");
-                    lesserBoundaryCorner = this.locationFromString(lesserCornerString, validWorlds);
-                    String greaterCornerString = results.getString("greatercorner");
-                    greaterBoundaryCorner = this.locationFromString(greaterCornerString, validWorlds);
-                } catch (Exception e) {
-                    if (e.getMessage() != null && e.getMessage().contains("World not found")) {
-                        EterniaKamui.AddLogEntry("Failed to load a claim (ID:" + Long.toString(claimID) + ") because its world isn't loaded (yet?).  Please delete the claim or contact the GriefPrevention developer with information about which plugin(s) you're using to load or create worlds.  " + lesserCornerString);
-                        continue;
+                    long parentId = resultSet.getLong("parentid");
+                    claimID = resultSet.getLong("id");
+                    boolean inheritNothing = resultSet.getBoolean("inheritNothing");
+                    Location lesserBoundaryCorner;
+                    Location greaterBoundaryCorner;
+                    String lesserCornerString = "(location not available)";
+                    try {
+                        lesserCornerString = resultSet.getString("lessercorner");
+                        lesserBoundaryCorner = this.locationFromString(lesserCornerString, validWorlds);
+                        String greaterCornerString = resultSet.getString("greatercorner");
+                        greaterBoundaryCorner = this.locationFromString(greaterCornerString, validWorlds);
+                    } catch (Exception e) {
+                        if (e.getMessage() != null && e.getMessage().contains("World not found")) {
+                            EterniaKamui.AddLogEntry("Failed to load a claim (ID:" + claimID + ") because its world isn't loaded (yet?).  Please delete the claim or contact the GriefPrevention developer with information about which plugin(s) you're using to load or create worlds.  " + lesserCornerString);
+                            continue;
+                        } else {
+                            throw e;
+                        }
+                    }
+
+                    String ownerName = resultSet.getString("owner");
+                    UUID ownerID;
+                    if (ownerName.isEmpty() || ownerName.startsWith("--")) {
+                        ownerID = null;  //administrative land claim or subdivision
+                    } else if (this.getSchemaVersion() < 1) {
+                        try {
+                            ownerID = UUIDFetcher.getUUIDOf(ownerName);
+                        } catch (Exception ex) {
+                            EterniaKamui.AddLogEntry("This owner name did not convert to a UUID: " + ownerName + ".");
+                            EterniaKamui.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
+                            ownerID = null;
+                        }
                     } else {
-                        throw e;
+                        try {
+                            ownerID = UUID.fromString(ownerName);
+                        } catch (Exception ex) {
+                            EterniaKamui.AddLogEntry("This owner entry is not a UUID: " + ownerName + ".");
+                            EterniaKamui.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
+                            ownerID = null;
+                        }
                     }
-                }
 
-                String ownerName = results.getString("owner");
-                UUID ownerID = null;
-                if (ownerName.isEmpty() || ownerName.startsWith("--")) {
-                    ownerID = null;  //administrative land claim or subdivision
-                } else if (this.getSchemaVersion() < 1) {
-                    try {
-                        ownerID = UUIDFetcher.getUUIDOf(ownerName);
-                    } catch (Exception ex) {
-                        EterniaKamui.AddLogEntry("This owner name did not convert to a UUID: " + ownerName + ".");
-                        EterniaKamui.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
+                    String buildersString = resultSet.getString("builders");
+                    List<String> builderNames = Arrays.asList(buildersString.split(";"));
+                    builderNames = this.convertNameListToUUIDList(builderNames);
+
+                    String containersString = resultSet.getString("containers");
+                    List<String> containerNames = Arrays.asList(containersString.split(";"));
+                    containerNames = this.convertNameListToUUIDList(containerNames);
+
+                    String accessorsString = resultSet.getString("accessors");
+                    List<String> accessorNames = Arrays.asList(accessorsString.split(";"));
+                    accessorNames = this.convertNameListToUUIDList(accessorNames);
+
+                    String managersString = resultSet.getString("managers");
+                    List<String> managerNames = Arrays.asList(managersString.split(";"));
+                    managerNames = this.convertNameListToUUIDList(managerNames);
+                    Claim claim = new Claim(lesserBoundaryCorner, greaterBoundaryCorner, ownerID, builderNames, containerNames, accessorNames, managerNames, inheritNothing, claimID);
+
+                    if (parentId == -1) {
+                        //top level claim
+                        this.addClaim(claim, false);
+                    } else {
+                        //subdivision
+                        subdivisionsToLoad.add(claim);
                     }
-                } else {
-                    try {
-                        ownerID = UUID.fromString(ownerName);
-                    } catch (Exception ex) {
-                        EterniaKamui.AddLogEntry("This owner entry is not a UUID: " + ownerName + ".");
-                        EterniaKamui.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
-                    }
+                } catch (SQLException e) {
+                    EterniaKamui.AddLogEntry("Unable to load a claim.  Details: " + e.getMessage() + " ... " + resultSet.toString());
+                    e.printStackTrace();
                 }
-
-                String buildersString = results.getString("builders");
-                List<String> builderNames = Arrays.asList(buildersString.split(";"));
-                builderNames = this.convertNameListToUUIDList(builderNames);
-
-                String containersString = results.getString("containers");
-                List<String> containerNames = Arrays.asList(containersString.split(";"));
-                containerNames = this.convertNameListToUUIDList(containerNames);
-
-                String accessorsString = results.getString("accessors");
-                List<String> accessorNames = Arrays.asList(accessorsString.split(";"));
-                accessorNames = this.convertNameListToUUIDList(accessorNames);
-
-                String managersString = results.getString("managers");
-                List<String> managerNames = Arrays.asList(managersString.split(";"));
-                managerNames = this.convertNameListToUUIDList(managerNames);
-                Claim claim = new Claim(lesserBoundaryCorner, greaterBoundaryCorner, ownerID, builderNames, containerNames, accessorNames, managerNames, inheritNothing, claimID);
-
-                if (parentId == -1) {
-                    //top level claim
-                    this.addClaim(claim, false);
-                } else {
-                    //subdivision
-                    subdivisionsToLoad.add(claim);
-                }
-            } catch (SQLException e) {
-                EterniaKamui.AddLogEntry("Unable to load a claim.  Details: " + e.getMessage() + " ... " + results.toString());
-                e.printStackTrace();
-            }
-        }
-
-        //add subdivisions to their parent claims
-        for (Claim childClaim : subdivisionsToLoad) {
-            //find top level claim parent
-            Claim topLevelClaim = this.getClaimAt(childClaim.getLesserBoundaryCorner(), true, null);
-
-            if (topLevelClaim == null) {
-                claimsToRemove.add(childClaim);
-                EterniaKamui.AddLogEntry("Removing orphaned claim subdivision: " + childClaim.getLesserBoundaryCorner().toString());
-                continue;
             }
 
-            //add this claim to the list of children of the current top level claim
-            childClaim.parent = topLevelClaim;
-            topLevelClaim.children.add(childClaim);
-            childClaim.inDataStore = true;
-        }
+            //add subdivisions to their parent claims
+            for (Claim childClaim : subdivisionsToLoad) {
+                //find top level claim parent
+                Claim topLevelClaim = this.getClaimAt(childClaim.getLesserBoundaryCorner(), null);
 
-        for (Claim claim : claimsToRemove) {
-            this.deleteClaimFromSecondaryStorage(claim);
+                if (topLevelClaim == null) {
+                    claimsToRemove.add(childClaim);
+                    EterniaKamui.AddLogEntry("Removing orphaned claim subdivision: " + childClaim.getLesserBoundaryCorner().toString());
+                    continue;
+                }
+
+                //add this claim to the list of children of the current top level claim
+                childClaim.parent = topLevelClaim;
+                topLevelClaim.children.add(childClaim);
+                childClaim.inDataStore = true;
+            }
+
+            for (Claim claim : claimsToRemove) {
+                this.deleteClaimFromSecondaryStorage(claim);
+            }
+
+        } catch (SQLException exception) {
+            EterniaKamui.AddLogEntry("Erro ao carregar claims");
         }
 
         if (this.getSchemaVersion() <= 2) {
-            this.refreshDataConnection();
-            statement = this.databaseConnection.createStatement();
-            statement.execute("DELETE FROM griefprevention_claimdata WHERE id='-1';");
+            try (Connection connection = SQL.getConnection()) {
+                connection.prepareStatement("DELETE FROM ek_claimdata WHERE id='-1';").execute();
+            } catch (SQLException exception) {
+                EterniaKamui.AddLogEntry("A database está fechada.");
+            }
         }
 
         super.initialize();
     }
 
     @Override
-    synchronized void writeClaimToStorage(Claim claim)  //see datastore.cs.  this will ALWAYS be a top level claim
-    {
+    synchronized void writeClaimToStorage(Claim claim) {
         try {
-            this.refreshDataConnection();
-
             //wipe out any existing data about this claim
             this.deleteClaimFromSecondaryStorage(claim);
 
@@ -366,7 +301,8 @@ public class DatabaseDataStore extends DataStore {
         boolean inheritNothing = claim.getSubclaimRestrictions();
         long parentId = claim.parent == null ? -1 : claim.parent.id;
 
-        try (PreparedStatement insertStmt = this.databaseConnection.prepareStatement(this.getInsertClaimSQL())) {
+        try (Connection connection = SQL.getConnection();
+             PreparedStatement insertStmt = connection.prepareStatement(SQL_INSERT_CLAIM)) {
 
             insertStmt.setLong(1, claim.id);
             insertStmt.setString(2, owner);
@@ -388,7 +324,8 @@ public class DatabaseDataStore extends DataStore {
     //deletes a claim from the database
     @Override
     synchronized void deleteClaimFromSecondaryStorage(Claim claim) {
-        try (PreparedStatement deleteStmnt = this.databaseConnection.prepareStatement(this.getDeleteClaimSQL())) {
+        try (Connection connection = SQL.getConnection();
+             PreparedStatement deleteStmnt = connection.prepareStatement(SQL_DELETE_CLAIM)) {
             deleteStmnt.setLong(1, claim.id);
             deleteStmnt.executeUpdate();
         } catch (SQLException e) {
@@ -403,7 +340,8 @@ public class DatabaseDataStore extends DataStore {
         PlayerData playerData = new PlayerData();
         playerData.playerID = playerID;
 
-        try (PreparedStatement selectStmnt = this.databaseConnection.prepareStatement(this.getGetPlayerDataSQL())) {
+        try (Connection connection = SQL.getConnection();
+             PreparedStatement selectStmnt = connection.prepareStatement(SQL_SELECT_PLAYER_DATA)) {
             selectStmnt.setString(1, playerID.toString());
             ResultSet results = selectStmnt.executeQuery();
 
@@ -431,12 +369,13 @@ public class DatabaseDataStore extends DataStore {
     }
 
     private void savePlayerData(String playerID, PlayerData playerData) {
-        try (PreparedStatement deleteStmnt = this.databaseConnection.prepareStatement(this.getDeletePlayerDataSQL());
-             PreparedStatement insertStmnt = this.databaseConnection.prepareStatement(this.getInsertPlayerDataSQL())) {
+        try (Connection connection = SQL.getConnection();
+             PreparedStatement deleteStmnt = connection.prepareStatement(SQL_DELETE_PLAYER_DATA);
+             PreparedStatement insertStmnt = connection.prepareStatement(SQL_INSERT_PLAYER_DATA)) {
             OfflinePlayer player = Bukkit.getOfflinePlayer(UUID.fromString(playerID));
 
             SimpleDateFormat sqlFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-            String dateString = sqlFormat.format(new Date(player.getLastPlayed()));
+            String dateString = sqlFormat.format(new Date(player.getLastSeen()));
             deleteStmnt.setString(1, playerID);
             deleteStmnt.executeUpdate();
 
@@ -461,8 +400,9 @@ public class DatabaseDataStore extends DataStore {
     synchronized void setNextClaimID(long nextID) {
         this.nextClaimID = nextID;
 
-        try (PreparedStatement deleteStmnt = this.databaseConnection.prepareStatement(this.getDeleteNextClaimIdSQL());
-             PreparedStatement insertStmnt = this.databaseConnection.prepareStatement(this.getInsertNextClaimIdSQL())) {
+        try (Connection connection = SQL.getConnection();
+             PreparedStatement deleteStmnt = connection.prepareStatement(SQL_DELETE_NEXT_CLAIM_ID);
+             PreparedStatement insertStmnt = connection.prepareStatement(SQL_SET_NEXT_CLAIM_ID)) {
             deleteStmnt.execute();
             insertStmnt.setLong(1, nextID);
             insertStmnt.executeUpdate();
@@ -476,8 +416,9 @@ public class DatabaseDataStore extends DataStore {
     @Override
     synchronized void saveGroupBonusBlocks(String groupName, int currentValue) {
         //group bonus blocks are stored in the player data table, with player name = $groupName
-        try (PreparedStatement deleteStmnt = this.databaseConnection.prepareStatement(this.getDeleteGroupBonusSQL());
-             PreparedStatement insertStmnt = this.databaseConnection.prepareStatement(this.getInsertPlayerDataSQL())) {
+        try (Connection connection = SQL.getConnection();
+             PreparedStatement deleteStmnt = connection.prepareStatement(SQL_DELETE_GROUP_DATA);
+             PreparedStatement insertStmnt = connection.prepareStatement(SQL_INSERT_PLAYER_DATA)) {
             SimpleDateFormat sqlFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             String dateString = sqlFormat.format(new Date());
             deleteStmnt.setString(1, '$' + groupName);
@@ -493,42 +434,10 @@ public class DatabaseDataStore extends DataStore {
             EterniaKamui.AddLogEntry(e.getMessage());
         }
     }
-
-    @Override
-    synchronized void close() {
-        if (this.databaseConnection != null) {
-            try {
-                if (!this.databaseConnection.isClosed()) {
-                    this.databaseConnection.close();
-                }
-            } catch (SQLException ignored) {
-            }
-        }
-
-        this.databaseConnection = null;
-    }
-
-    private synchronized void refreshDataConnection() throws SQLException {
-        if (this.databaseConnection == null || !this.databaseConnection.isValid(3)) {
-            if (this.databaseConnection != null && !this.databaseConnection.isClosed()) {
-                this.databaseConnection.close();
-            }
-
-            //set username/pass properties
-            Properties connectionProps = new Properties();
-            connectionProps.put("user", this.userName);
-            connectionProps.put("password", this.password);
-            connectionProps.put("autoReconnect", "true");
-            connectionProps.put("maxReconnects", String.valueOf(Integer.MAX_VALUE));
-
-            //establish connection
-            this.databaseConnection = DriverManager.getConnection(this.databaseUrl, connectionProps);
-        }
-    }
-
     @Override
     protected int getSchemaVersionFromStorage() {
-        try (PreparedStatement selectStmnt = this.databaseConnection.prepareStatement(this.getSelectSchemaVersionSQL())) {
+        try (Connection connection = SQL.getConnection();
+             PreparedStatement selectStmnt = connection.prepareStatement(SQL_SELECT_SCHEMA_VERSION)) {
             ResultSet results = selectStmnt.executeQuery();
 
             //if there's nothing yet, assume 0 and add it
@@ -550,15 +459,15 @@ public class DatabaseDataStore extends DataStore {
 
     @Override
     protected void updateSchemaVersionInStorage(int versionToSet) {
-        try (PreparedStatement deleteStmnt = this.databaseConnection.prepareStatement(this.getDeleteSchemaVersionSQL());
-             PreparedStatement insertStmnt = this.databaseConnection.prepareStatement(this.getInsertSchemaVerSQL())) {
+        try (Connection connection = SQL.getConnection();
+             PreparedStatement deleteStmnt = connection.prepareStatement(SQL_DELETE_SCHEMA_VERSION);
+             PreparedStatement insertStmnt = connection.prepareStatement(SQL_INSERT_SCHEMA_VERSION)) {
             deleteStmnt.execute();
-
             insertStmnt.setInt(1, versionToSet);
             insertStmnt.executeUpdate();
-        } catch (SQLException e) {
-            EterniaKamui.AddLogEntry("Unable to set next schema version to " + versionToSet + ".  Details:");
-            EterniaKamui.AddLogEntry(e.getMessage());
+        } catch (SQLException exception) {
+            EterniaKamui.AddLogEntry("Erro ao definir a proxima schema version para " + versionToSet + ".  Detalhes:");
+            EterniaKamui.AddLogEntry(exception.getMessage());
         }
     }
 
@@ -576,51 +485,4 @@ public class DatabaseDataStore extends DataStore {
         return output.toString();
     }
 
-    public String getUpdateNameSQL() {
-        return updateNameSQL;
-    }
-
-    public String getInsertClaimSQL() {
-        return insertClaimSQL;
-    }
-
-    public String getDeleteClaimSQL() {
-        return deleteClaimSQL;
-    }
-
-    public String getGetPlayerDataSQL() {
-        return getPlayerDataSQL;
-    }
-
-    public String getDeletePlayerDataSQL() {
-        return deletePlayerDataSQL;
-    }
-
-    public String getInsertPlayerDataSQL() {
-        return insertPlayerDataSQL;
-    }
-
-    public String getInsertNextClaimIdSQL() {
-        return insertNextClaimIdSQL;
-    }
-
-    public String getDeleteGroupBonusSQL() {
-        return deleteGroupBonusSQL;
-    }
-
-    public String getInsertSchemaVerSQL() {
-        return insertSchemaVerSQL;
-    }
-
-    public String getDeleteNextClaimIdSQL() {
-        return deleteNextClaimIdSQL;
-    }
-
-    public String getDeleteSchemaVersionSQL() {
-        return deleteSchemaVersionSQL;
-    }
-
-    public String getSelectSchemaVersionSQL() {
-        return selectSchemaVersionSQL;
-    }
 }
