@@ -18,6 +18,7 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.Materials;
 import br.com.eterniaserver.eterniakamui.enums.Messages;
 import br.com.eterniaserver.eterniakamui.enums.ShovelMode;
 import br.com.eterniaserver.eterniakamui.enums.VisualizationType;
@@ -27,7 +28,7 @@ import org.bukkit.inventory.EquipmentSlot;
 //tells a player about how many claim blocks he has, etc
 //implemented as a task so that it can be delayed
 //otherwise, it's spammy when players mouse-wheel past the shovel in their hot bars
-class EquipShovelProcessingTask implements Runnable {
+public class EquipShovelProcessingTask implements Runnable {
     //player data
     private final Player player;
 
@@ -38,7 +39,7 @@ class EquipShovelProcessingTask implements Runnable {
     @Override
     public void run() {
         //if he's not holding the golden shovel anymore, do nothing
-        if (EterniaKamui.instance.getItemInHand(player, EquipmentSlot.HAND).getType() != EterniaKamui.instance.config_claims_modificationTool)
+        if (EterniaKamui.instance.getItemInHand(player, EquipmentSlot.HAND).getType() != EterniaKamui.getMaterials(Materials.MODIFICATION_TOOL))
             return;
 
         PlayerData playerData = EterniaKamui.instance.dataStore.getPlayerData(player.getUniqueId());

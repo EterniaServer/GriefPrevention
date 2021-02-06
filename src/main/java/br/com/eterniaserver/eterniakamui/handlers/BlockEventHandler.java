@@ -13,13 +13,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package br.com.eterniaserver.eterniakamui;
+package br.com.eterniaserver.eterniakamui.handlers;
 
+import br.com.eterniaserver.eterniakamui.*;
 import br.com.eterniaserver.eterniakamui.enums.*;
 import br.com.eterniaserver.eterniakamui.util.BoundingBox;
 
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -68,7 +68,6 @@ import org.bukkit.projectiles.BlockProjectileSource;
 import org.bukkit.projectiles.ProjectileSource;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
@@ -126,44 +125,11 @@ public class BlockEventHandler implements Listener {
         Block sign = event.getBlock();
 
         String noBuildReason = EterniaKamui.instance.allowBuild(player, sign.getLocation(), sign.getType());
-        if (noBuildReason != null)
-        {
+        if (noBuildReason != null) {
             EterniaKamui.sendMessage(player, TextMode.Err, noBuildReason);
             event.setCancelled(true);
-            return;
         }
 
-        //send sign content to online administrators
-        if (!EterniaKamui.instance.config_signNotifications) return;
-
-        StringBuilder lines = new StringBuilder(" placed a sign @ " + EterniaKamui.getfriendlyLocationString(event.getBlock().getLocation()));
-        boolean notEmpty = false;
-        for (int i = 0; i < event.getLines().length; i++) {
-            String withoutSpaces = event.getLine(i).replace(" ", "");
-            if (!withoutSpaces.isEmpty()) {
-                notEmpty = true;
-                lines.append("\n  ").append(event.getLine(i));
-            }
-        }
-
-        String signMessage = lines.toString();
-
-        //if not empty and wasn't the same as the last sign, log it and remember it for later
-        //This has been temporarily removed since `signMessage` includes location, not just the message. Waste of memory IMO
-        if (notEmpty) {
-            EterniaKamui.AddLogEntry(player.getName() + lines.toString().replace("\n  ", ";"), null);
-            PlayerEventHandler.makeSocialLogEntry(player.getName(), signMessage);
-
-            if (!player.hasPermission("griefprevention.eavesdropsigns")) {
-                @SuppressWarnings("unchecked")
-                Collection<Player> players = (Collection<Player>) EterniaKamui.instance.getServer().getOnlinePlayers();
-                for (Player otherPlayer : players) {
-                    if (otherPlayer.hasPermission("griefprevention.eavesdropsigns")) {
-                        otherPlayer.sendMessage(ChatColor.GRAY + player.getName() + signMessage);
-                    }
-                }
-            }
-        }
     }
 
     //when a player places multiple blocks...
@@ -443,7 +409,7 @@ public class BlockEventHandler implements Listener {
         return isActiveBlock(block.getType());
     }
 
-    static boolean isActiveBlock(BlockState state) {
+    public static boolean isActiveBlock(BlockState state) {
         return isActiveBlock(state.getType());
     }
 

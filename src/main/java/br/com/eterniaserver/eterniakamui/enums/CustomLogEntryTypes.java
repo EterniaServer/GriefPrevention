@@ -23,6 +23,5 @@ public enum CustomLogEntryTypes {
     SuspiciousActivity,
     AdminActivity,
     Debug,
-    Exception,
-    MutedChat
+    Exception
 }

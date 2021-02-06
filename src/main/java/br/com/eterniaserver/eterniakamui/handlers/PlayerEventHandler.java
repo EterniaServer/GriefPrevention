@@ -16,14 +16,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package br.com.eterniaserver.eterniakamui;
+package br.com.eterniaserver.eterniakamui.handlers;
 
+import br.com.eterniaserver.eterniakamui.*;
 import br.com.eterniaserver.eterniakamui.enums.*;
 import br.com.eterniaserver.eterniakamui.events.ClaimInspectionEvent;
 import br.com.eterniaserver.eterniakamui.events.VisualizationEvent;
 
-import br.com.eterniaserver.eterniakamui.util.BroadcastMessageTask;
-import org.bukkit.BanList;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
@@ -39,7 +38,6 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Levelled;
 import org.bukkit.block.data.Waterlogged;
-import org.bukkit.command.Command;
 import org.bukkit.entity.AbstractHorse;
 import org.bukkit.entity.Animals;
 import org.bukkit.entity.Creature;
@@ -73,7 +71,6 @@ import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
-import org.bukkit.event.player.PlayerLoginEvent.Result;
 import org.bukkit.event.player.PlayerPickupItemEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
@@ -85,37 +82,27 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.metadata.MetadataValue;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.BlockIterator;
 
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-class PlayerEventHandler implements Listener {
+public class PlayerEventHandler implements Listener {
     private final DataStore dataStore;
     private final EterniaKamui instance;
 
-    //list of temporarily banned ip's
-    private final ArrayList<IpBanInfo> tempBannedIps = new ArrayList<>();
-
-    //timestamps of login and logout notifications in the last minute
-    private final ArrayList<Long> recentLoginLogoutNotifications = new ArrayList<>();
 
     //typical constructor, yawn
-    PlayerEventHandler(DataStore dataStore, EterniaKamui plugin) {
+    public PlayerEventHandler(DataStore dataStore, EterniaKamui plugin) {
         this.dataStore = dataStore;
         this.instance = plugin;
     }
@@ -214,93 +201,8 @@ class PlayerEventHandler implements Listener {
             }
         }
 
-        //FEATURE: auto-ban accounts who use an IP address which was very recently used by another banned account
-        if (instance.config_smartBan && !player.hasPlayedBefore()) {
-            //search temporarily banned IP addresses for this one
-            for (int i = 0; i < this.tempBannedIps.size(); i++) {
-                IpBanInfo info = this.tempBannedIps.get(i);
-                String address = info.address.toString();
-
-                //eliminate any expired entries
-                if (now > info.expirationTimestamp) {
-                    this.tempBannedIps.remove(i--);
-                }
-
-                //if we find a match
-                else if (address.equals(playerData.ipAddress.toString())) {
-                    //if the account associated with the IP ban has been pardoned, remove all ip bans for that ip and we're done
-                    OfflinePlayer bannedPlayer = instance.getServer().getOfflinePlayer(info.bannedAccountName);
-                    if (!bannedPlayer.isBanned()) {
-                        for (int j = 0; j < this.tempBannedIps.size(); j++) {
-                            IpBanInfo info2 = this.tempBannedIps.get(j);
-                            if (info2.address.toString().equals(address)) {
-                                OfflinePlayer bannedAccount = instance.getServer().getOfflinePlayer(info2.bannedAccountName);
-                                instance.getServer().getBanList(BanList.Type.NAME).pardon(bannedAccount.getName());
-                                this.tempBannedIps.remove(j--);
-                            }
-                        }
-
-                        break;
-                    }
-
-                    //otherwise if that account is still banned, ban this account, too
-                    else {
-                        EterniaKamui.AddLogEntry("Auto-banned new player " + player.getName() + " because that account is using an IP address very recently used by banned player " + info.bannedAccountName + " (" + info.address.toString() + ").", CustomLogEntryTypes.AdminActivity);
-
-                        //notify any online ops
-                        @SuppressWarnings("unchecked")
-                        Collection<Player> players = (Collection<Player>) instance.getServer().getOnlinePlayers();
-                        for (Player otherPlayer : players) {
-                            if (otherPlayer.isOp()) {
-                                EterniaKamui.sendMessage(otherPlayer, TextMode.Success, Messages.AutoBanNotify, player.getName(), info.bannedAccountName);
-                            }
-                        }
-
-                        //ban player
-                        PlayerKickBanTask task = new PlayerKickBanTask(player, "", "GriefPrevention Smart Ban - Shared Login:" + info.bannedAccountName, true);
-                        instance.getServer().getScheduler().scheduleSyncDelayedTask(instance, task, 10L);
-
-                        //silence join message
-                        event.setJoinMessage("");
-
-                        break;
-                    }
-                }
-            }
-        }
-
         //in case player has changed his name, on successful login, update UUID > Name mapping
         EterniaKamui.cacheUUIDNamePair(player.getUniqueId(), player.getName());
-
-        //ensure we're not over the limit for this IP address
-        InetAddress ipAddress = playerData.ipAddress;
-        if (ipAddress != null) {
-            int ipLimit = instance.config_ipLimit;
-            if (ipLimit > 0 && EterniaKamui.isNewToServer(player)) {
-                int ipCount = 0;
-
-                @SuppressWarnings("unchecked")
-                Collection<Player> players = (Collection<Player>) instance.getServer().getOnlinePlayers();
-                for (Player onlinePlayer : players) {
-                    if (onlinePlayer.getUniqueId().equals(player.getUniqueId())) continue;
-
-                    PlayerData otherData = instance.dataStore.getPlayerData(onlinePlayer.getUniqueId());
-                    if (ipAddress.equals(otherData.ipAddress) && EterniaKamui.isNewToServer(onlinePlayer)) {
-                        ipCount++;
-                    }
-                }
-
-                if (ipCount >= ipLimit) {
-                    //kick player
-                    PlayerKickBanTask task = new PlayerKickBanTask(player, EterniaKamui.getMessage(Messages.TooMuchIpOverlap), "GriefPrevention IP-sharing limit.", false);
-                    instance.getServer().getScheduler().scheduleSyncDelayedTask(instance, task, 100L);
-
-                    //silence join message
-                    event.setJoinMessage(null);
-                    return;
-                }
-            }
-        }
 
         //is he stuck in a portal frame?
         if (player.hasMetadata("GP_PORTALRESCUE")) {
@@ -367,9 +269,6 @@ class PlayerEventHandler implements Listener {
         playerData.wasKicked = true;
     }
 
-    //when a player quits...
-    private final HashMap<UUID, Integer> heldLogoutMessages = new HashMap<>();
-
     @EventHandler(priority = EventPriority.HIGHEST)
     void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
@@ -387,14 +286,6 @@ class PlayerEventHandler implements Listener {
             isBanned = player.isBanned();
         } else {
             isBanned = false;
-        }
-
-        //if banned, add IP to the temporary IP ban list
-        if (isBanned && playerData.ipAddress != null) {
-            long now = Calendar.getInstance().getTimeInMillis();
-            //number of milliseconds in a day
-            long MILLISECONDS_IN_DAY = 1000 * 60 * 60 * 24;
-            this.tempBannedIps.add(new IpBanInfo(playerData.ipAddress, now + MILLISECONDS_IN_DAY, player.getName()));
         }
 
         //silence notifications when the player is banned
@@ -726,7 +617,7 @@ class PlayerEventHandler implements Listener {
         //if he's switching to the golden shovel
         int newSlot = event.getNewSlot();
         ItemStack newItemStack = player.getInventory().getItem(newSlot);
-        if (newItemStack != null && newItemStack.getType() == instance.config_claims_modificationTool) {
+        if (newItemStack != null && newItemStack.getType() == EterniaKamui.getMaterials(Materials.MODIFICATION_TOOL)) {
             //give the player his available claim blocks count and claiming instructions, but only if he keeps the shovel equipped for a minimum time, to avoid mouse wheel spam
             if (instance.claimsEnabledForWorld(player.getWorld())) {
                 EquipShovelProcessingTask task = new EquipShovelProcessingTask(player);
@@ -1172,7 +1063,7 @@ class PlayerEventHandler implements Listener {
             }
 
             //if he's investigating a claim
-            else if (materialInHand == instance.config_claims_investigationTool && hand == EquipmentSlot.HAND) {
+            else if (materialInHand == EterniaKamui.getMaterials(Materials.INVESTIGATION_TOOL) && hand == EquipmentSlot.HAND) {
                 //if claims are disabled in this world, do nothing
                 if (!instance.claimsEnabledForWorld(player.getWorld())) return;
 
@@ -1283,12 +1174,9 @@ class PlayerEventHandler implements Listener {
             }
 
             //if it's a golden shovel
-            else if (materialInHand != instance.config_claims_modificationTool || hand != EquipmentSlot.HAND) return;
+            else if (materialInHand != EterniaKamui.getMaterials(Materials.MODIFICATION_TOOL) || hand != EquipmentSlot.HAND) return;
 
             event.setCancelled(true);  //GriefPrevention exclusively reserves this tool  (e.g. no grass path creation for golden shovel)
-
-            //disable golden shovel while under siege
-            if (playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
 
             //FEATURE: shovel and stick can be used from a distance away
             if (action == Action.RIGHT_CLICK_AIR) {

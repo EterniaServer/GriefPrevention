@@ -18,6 +18,7 @@
 
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.Booleans;
 import br.com.eterniaserver.eterniakamui.enums.Integers;
 import br.com.eterniaserver.eterniakamui.events.ClaimExpirationEvent;
 import br.com.eterniaserver.eterniakamui.enums.CustomLogEntryTypes;
@@ -50,10 +51,10 @@ class CleanupUnusedClaimTask implements Runnable {
         }
 
         //if this claim is a chest claim and those are set to expire
-        if (claim.getArea() <= areaOfDefaultClaim && EterniaKamui.instance.config_claims_chestClaimExpirationDays > 0) {
+        if (claim.getArea() <= areaOfDefaultClaim && EterniaKamui.getInt(Integers.CLAIMS_CHEST_CLAIM_EXPIRATION_DAYS) > 0) {
             //if the owner has been gone at least a week, and if he has ONLY the new player claim, it will be removed
             Calendar sevenDaysAgo = Calendar.getInstance();
-            sevenDaysAgo.add(Calendar.DATE, -EterniaKamui.instance.config_claims_chestClaimExpirationDays);
+            sevenDaysAgo.add(Calendar.DATE, - EterniaKamui.getInt(Integers.CLAIMS_CHEST_CLAIM_EXPIRATION_DAYS));
             boolean newPlayerClaimsExpired = sevenDaysAgo.getTime().after(new Date(ownerInfo.getLastSeen()));
             if (newPlayerClaimsExpired && ownerData.getClaims().size() == 1) {
                 if (expireEventCanceled())
@@ -62,7 +63,7 @@ class CleanupUnusedClaimTask implements Runnable {
                 EterniaKamui.instance.dataStore.deleteClaim(claim, true, true);
 
                 //if configured to do so, restore the land to natural
-                if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()) || EterniaKamui.instance.config_claims_survivalAutoNatureRestoration) {
+                if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()) || EterniaKamui.getBool(Booleans.CLAIMS_SURVIVAL_AUTO_NATURE_RESTORATION)) {
                     EterniaKamui.instance.restoreClaim(claim, 0);
                 }
 
@@ -90,12 +91,12 @@ class CleanupUnusedClaimTask implements Runnable {
 
                 for (Claim value : claims) {
                     //if configured to do so, restore the land to natural
-                    if (EterniaKamui.instance.creativeRulesApply(value.getLesserBoundaryCorner()) || EterniaKamui.instance.config_claims_survivalAutoNatureRestoration) {
+                    if (EterniaKamui.instance.creativeRulesApply(value.getLesserBoundaryCorner()) || EterniaKamui.getBool(Booleans.CLAIMS_SURVIVAL_AUTO_NATURE_RESTORATION)) {
                         EterniaKamui.instance.restoreClaim(value, 0);
                     }
                 }
             }
-        } else if (EterniaKamui.instance.config_claims_unusedClaimExpirationDays > 0 && EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner())) {
+        } else if (EterniaKamui.getInt(Integers.CLAIMS_UNUSED_CLAIM_EXPIRATION_DAYS) > 0 && EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner())) {
             //avoid scanning large claims and administrative claims
             if (claim.isAdminClaim() || claim.getWidth() > 25 || claim.getHeight() > 25) return;
 
@@ -107,7 +108,7 @@ class CleanupUnusedClaimTask implements Runnable {
             if (investmentScore < minInvestment) {
                 //if the owner has been gone at least a week, and if he has ONLY the new player claim, it will be removed
                 Calendar sevenDaysAgo = Calendar.getInstance();
-                sevenDaysAgo.add(Calendar.DATE, -EterniaKamui.instance.config_claims_unusedClaimExpirationDays);
+                sevenDaysAgo.add(Calendar.DATE, - EterniaKamui.getInt(Integers.CLAIMS_UNUSED_CLAIM_EXPIRATION_DAYS));
                 boolean claimExpired = sevenDaysAgo.getTime().after(new Date(ownerInfo.getLastSeen()));
                 if (claimExpired) {
                     if (expireEventCanceled())

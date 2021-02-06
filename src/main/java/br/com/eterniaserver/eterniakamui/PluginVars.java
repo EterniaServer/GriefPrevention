@@ -17,8 +17,8 @@ public class PluginVars {
     public static final List<String> types = List.of("flat", "amplified", "large_biomes", "normal");
     public static final List<String> enviroments = List.of("nether", "end", "normal");
 
-    protected static final List<String> worlds = new ArrayList<>();
-    protected static final Map<String, Integer> invClear = new HashMap<>();
-    protected static final Map<Long, ClaimFlag> claimFlags = new HashMap<>();
+    public static final List<String> worlds = new ArrayList<>();
+    public static final Map<String, Integer> invClear = new HashMap<>();
+    public static final Map<Long, ClaimFlag> claimFlags = new HashMap<>();
 
 }

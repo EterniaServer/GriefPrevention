@@ -16,8 +16,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package br.com.eterniaserver.eterniakamui;
+package br.com.eterniaserver.eterniakamui.handlers;
 
+import br.com.eterniaserver.eterniakamui.*;
 import br.com.eterniaserver.eterniakamui.enums.Booleans;
 import br.com.eterniaserver.eterniakamui.events.PreventPvPEvent;
 import br.com.eterniaserver.eterniakamui.events.ProtectDeathDropsEvent;
@@ -115,7 +116,7 @@ public class EntityEventHandler implements Listener {
     final EterniaKamui instance;
     private final NamespacedKey luredByPlayer;
 
-    private static Set<EntityType> monsters = Set.of(EntityType.BLAZE, EntityType.CAVE_SPIDER, EntityType.CREEPER, EntityType.DROWNED, 
+    private static final Set<EntityType> monsters = Set.of(EntityType.BLAZE, EntityType.CAVE_SPIDER, EntityType.CREEPER, EntityType.DROWNED,
         EntityType.ELDER_GUARDIAN, EntityType.ENDER_DRAGON, EntityType.ENDERMAN, EntityType.ENDERMITE, EntityType.EVOKER, 
         EntityType.EVOKER_FANGS, EntityType.GHAST, EntityType.GIANT, EntityType.GUARDIAN, EntityType.HOGLIN, EntityType.HUSK,
         EntityType.ILLUSIONER, EntityType.MAGMA_CUBE, EntityType.PHANTOM, EntityType.PIGLIN, EntityType.PIGLIN_BRUTE, EntityType.PILLAGER,

@@ -268,20 +268,15 @@ public class DatabaseDataStore extends DataStore {
 
     @Override
     synchronized void writeClaimToStorage(Claim claim) {
-        try {
-            //wipe out any existing data about this claim
-            this.deleteClaimFromSecondaryStorage(claim);
+        //wipe out any existing data about this claim
+        this.deleteClaimFromSecondaryStorage(claim);
 
-            //write claim data to the database
-            this.writeClaimData(claim);
-        } catch (SQLException e) {
-            EterniaKamui.AddLogEntry("Unable to save data for claim at " + this.locationToString(claim.lesserBoundaryCorner) + ".  Details:");
-            EterniaKamui.AddLogEntry(e.getMessage());
-        }
+        //write claim data to the database
+        this.writeClaimData(claim);
     }
 
     //actually writes claim data to the database
-    synchronized private void writeClaimData(Claim claim) throws SQLException {
+    synchronized private void writeClaimData(Claim claim) {
         String lesserCornerString = this.locationToString(claim.getLesserBoundaryCorner());
         String greaterCornerString = this.locationToString(claim.getGreaterBoundaryCorner());
         String owner = "";

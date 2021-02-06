@@ -20,6 +20,7 @@ package br.com.eterniaserver.eterniakamui;
 
 import br.com.eterniaserver.eterniakamui.enums.ClaimPermission;
 import br.com.eterniaserver.eterniakamui.enums.Messages;
+import br.com.eterniaserver.eterniakamui.handlers.BlockEventHandler;
 import br.com.eterniaserver.eterniakamui.util.BoundingBox;
 
 import org.bukkit.Chunk;
@@ -53,7 +54,7 @@ public class Claim {
     Location greaterBoundaryCorner;
 
     //modification date.  this comes from the file timestamp during load, and is updated with runtime changes
-    public Date modifiedDate;
+    public final Date modifiedDate;
 
     //id number.  unique to this claim, never changes.
     Long id;
@@ -142,7 +143,7 @@ public class Claim {
         }
     }
     //main constructor.  note that only creating a claim instance does nothing - a claim must be added to the data store to be effective
-    Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, boolean inheritNothing, Long id) {
+    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, boolean inheritNothing, Long id) {
         //modification date
         this.modifiedDate = Calendar.getInstance().getTime();
 
@@ -178,7 +179,7 @@ public class Claim {
         this.inheritNothing = inheritNothing;
     }
 
-    Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, Long id) {
+    public Claim(Location lesserBoundaryCorner, Location greaterBoundaryCorner, UUID ownerID, List<String> builderIDs, List<String> containerIDs, List<String> accessorIDs, List<String> managerIDs, Long id) {
         this(lesserBoundaryCorner, greaterBoundaryCorner, ownerID, builderIDs, containerIDs, accessorIDs, managerIDs, false, id);
     }
 

@@ -1,5 +1,6 @@
 package br.com.eterniaserver.eterniakamui;
 
+import br.com.eterniaserver.eterniakamui.enums.Materials;
 import br.com.eterniaserver.eterniakamui.enums.Messages;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -7,6 +8,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFactory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BookMeta;
+
+import java.util.Locale;
 
 public class WelcomeTask implements Runnable {
     private final Player player;
@@ -38,8 +41,8 @@ public class WelcomeTask implements Runnable {
 
             page1.append(URL).append("\n\n");
             page1.append(intro).append("\n\n");
-            String editToolName = EterniaKamui.instance.config_claims_modificationTool.name().replace('_', ' ').toLowerCase();
-            String infoToolName = EterniaKamui.instance.config_claims_investigationTool.name().replace('_', ' ').toLowerCase();
+            String editToolName = EterniaKamui.getMaterials(Materials.MODIFICATION_TOOL).name().replace('_', ' ').toLowerCase();
+            String infoToolName = EterniaKamui.getMaterials(Materials.INVESTIGATION_TOOL).name().replace('_', ' ').toLowerCase();
             String configClaimTools = EterniaKamui.getMessage(Messages.BookTools, editToolName, infoToolName);
             page1.append(configClaimTools);
 

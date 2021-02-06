@@ -5,6 +5,7 @@ import br.com.eterniaserver.eterniakamui.EterniaKamui;
 import br.com.eterniaserver.eterniakamui.enums.*;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -18,7 +19,7 @@ public class ConfigsCfg {
     private final FileConfiguration configuration;
     private final FileConfiguration outConfiguration;
 
-    public ConfigsCfg(String[] strings, Boolean[] booleans, Integer[] integers, Double[] doubles) {
+    public ConfigsCfg(String[] strings, Boolean[] booleans, Integer[] integers, Double[] doubles, Material[] materials) {
 
         this.configuration = YamlConfiguration.loadConfiguration(new File(Constants.CONFIG_FILE_PATH));
         this.outConfiguration = new YamlConfiguration();
@@ -41,6 +42,8 @@ public class ConfigsCfg {
         booleans[Booleans.CLAIMS_RAID_TRIGGERS_REQUIRE_BUILDTRUST.ordinal()] = configuration.getBoolean("claims.raid-triggers-require-buildtrust", true);
         booleans[Booleans.CLAIMS_RESPECT_WORLDGUARD.ordinal()] = configuration.getBoolean("claims.respect-worldguard", true);
         booleans[Booleans.CLAIMS_VILLAGER_TRADING_REQUIRES_TRUST.ordinal()] = configuration.getBoolean("claims.villager-trading-requires-trust", true);
+        booleans[Booleans.CLAIMS_SURVIVAL_AUTO_NATURE_RESTORATION.ordinal()] = configuration.getBoolean("claims.survival-auto-nature-restoration", false);
+        booleans[Booleans.CLAIMS_ALLOW_TRAPPED_IN_ADMINCLAIMS.ordinal()] = configuration.getBoolean("claims.allow-trapped-in-adminclaims", true);
 
         integers[Integers.CLAIMS_MAX_CLAIMS_PER_PLAYER.ordinal()] = configuration.getInt("claims.max-claims-per-player", 0);
         integers[Integers.CLAIMS_INITIAL_BLOCKS.ordinal()] = configuration.getInt("claims.initial-blocks", 100);
@@ -52,8 +55,13 @@ public class ConfigsCfg {
         integers[Integers.CLAIMS_AUTOMATIC_CLAIMS_FOR_NEW_PLAYERS_RADIUS.ordinal()] = configuration.getInt("claims.automatic-claims-for-new-players-radius", 4);
         integers[Integers.CLAIMS_MIN_WIDTH.ordinal()] = configuration.getInt("claims.min-width", 5);
         integers[Integers.CLAIMS_MIN_AREA.ordinal()] = configuration.getInt("claims.min-area", 100);
+        integers[Integers.CLAIMS_CHEST_CLAIM_EXPIRATION_DAYS.ordinal()] = configuration.getInt("claims.chest-claim-expiration-days", 7);
+        integers[Integers.CLAIMS_UNUSED_CLAIM_EXPIRATION_DAYS.ordinal()] = configuration.getInt("claims.unused-claim-expiration-days", 14);
 
         doubles[Doubles.CLAIMS_ABANDON_RETURN_RATIO.ordinal()] = configuration.getDouble("claims.abandon-return-ratio", 1.0D);
+
+        materials[Materials.INVESTIGATION_TOOL.ordinal()] = Material.getMaterial(configuration.getString("claims.investigation-tool", Material.STICK.name()));
+        materials[Materials.MODIFICATION_TOOL.ordinal()] = Material.getMaterial(configuration.getString("claims.modification-tool", Material.GOLDEN_SHOVEL.name()));
 
         outConfiguration.set("sql.table-worlds", strings[Strings.TABLE_WORLDS.ordinal()]);
         outConfiguration.set("sql.table-flags", strings[Strings.TABLE_FLAGS.ordinal()]);
@@ -73,6 +81,8 @@ public class ConfigsCfg {
         outConfiguration.set("claims.piston-explosion-sound", booleans[Booleans.PISTON_EXPLOSION_SOUND.ordinal()]);
         outConfiguration.set("claims.respect-worldguard", booleans[Booleans.CLAIMS_RESPECT_WORLDGUARD.ordinal()]);
         outConfiguration.set("claims.villager-trading-requires-trust", booleans[Booleans.CLAIMS_VILLAGER_TRADING_REQUIRES_TRUST.ordinal()]);
+        outConfiguration.set("claims.survival-auto-nature-restoration", booleans[Booleans.CLAIMS_SURVIVAL_AUTO_NATURE_RESTORATION.ordinal()]);
+        outConfiguration.set("claims.allow-trapped-in-adminclaims", booleans[Booleans.CLAIMS_ALLOW_TRAPPED_IN_ADMINCLAIMS.ordinal()]);
 
         outConfiguration.set("claims.max-claims-per-player", integers[Integers.CLAIMS_MAX_CLAIMS_PER_PLAYER.ordinal()]);
         outConfiguration.set("claims.initial-blocks", integers[Integers.CLAIMS_INITIAL_BLOCKS.ordinal()]);
@@ -84,8 +94,13 @@ public class ConfigsCfg {
         outConfiguration.set("claims.automatic-claims-for-new-players-radius", integers[Integers.CLAIMS_AUTOMATIC_CLAIMS_FOR_NEW_PLAYERS_RADIUS.ordinal()]);
         outConfiguration.set("claims.min-width", integers[Integers.CLAIMS_MIN_WIDTH.ordinal()]);
         outConfiguration.set("claims.min-area", integers[Integers.CLAIMS_MIN_AREA.ordinal()]);
+        outConfiguration.set("claims.chest-claim-expiration-days", integers[Integers.CLAIMS_CHEST_CLAIM_EXPIRATION_DAYS.ordinal()]);
+        outConfiguration.set("claims.unused-claim-expiration-days", integers[Integers.CLAIMS_UNUSED_CLAIM_EXPIRATION_DAYS.ordinal()]);
 
         outConfiguration.set("claims.abandon-return-ratio", doubles[Doubles.CLAIMS_ABANDON_RETURN_RATIO.ordinal()]);
+
+        outConfiguration.set("claims.investigation-tool", materials[Materials.INVESTIGATION_TOOL.ordinal()].name());
+        outConfiguration.set("claims.modification-tool", materials[Materials.MODIFICATION_TOOL.ordinal()].name());
 
     }
 
@@ -123,7 +138,7 @@ public class ConfigsCfg {
         }
     }
 
-    public void saveOutConfiguration() {
+    public void saveConfiguration() {
         try {
             outConfiguration.save(Constants.CONFIG_FILE_PATH);
         } catch (IOException ignored) {

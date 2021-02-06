@@ -22,13 +22,15 @@ import br.com.eterniaserver.eterniakamui.enums.*;
 import br.com.eterniaserver.eterniakamui.events.PreventBlockBreakEvent;
 import br.com.eterniaserver.eterniakamui.events.SaveTrappedPlayerEvent;
 import br.com.eterniaserver.eterniakamui.events.TrustChangedEvent;
+import br.com.eterniaserver.eterniakamui.handlers.BlockEventHandler;
+import br.com.eterniaserver.eterniakamui.handlers.EconomyHandler;
+import br.com.eterniaserver.eterniakamui.handlers.EntityEventHandler;
+import br.com.eterniaserver.eterniakamui.handlers.PlayerEventHandler;
 import br.com.eterniaserver.eterniakamui.objects.BlockSnapshot;
 import br.com.eterniaserver.eternialib.CommandManager;
 
 import net.milkbowl.vault.economy.Economy;
 
-import org.bukkit.BanList;
-import org.bukkit.BanList.Type;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
@@ -67,6 +69,7 @@ public class EterniaKamui extends JavaPlugin {
     private static final Boolean[] booleans = new Boolean[Booleans.values().length];
     private static final String[] messages = new String[Messages.values().length];
     private static final Double[] doubles = new Double[Doubles.values().length];
+    private static final Material[] materials = new Material[Materials.values().length];
 
     private static final Map<World, ClaimsMode> claimsWorldModes = new ConcurrentHashMap<>();
 
@@ -88,13 +91,6 @@ public class EterniaKamui extends JavaPlugin {
 
     private EconomyHandler economyHandler;
 
-    public int config_claims_chestClaimExpirationDays;                //number of days of inactivity before an automatic chest claim will be deleted
-    public int config_claims_unusedClaimExpirationDays;                //number of days of inactivity before an unused (nothing build) claim will be deleted
-    public boolean config_claims_survivalAutoNatureRestoration;        //whether survival claims will be automatically restored to nature when auto-deleted
-    public boolean config_claims_allowTrappedInAdminClaims;            //whether it should be allowed to use /trapped in adminclaims.
-
-    public Material config_claims_investigationTool;                //which material will be used to investigate claims with a right click
-    public Material config_claims_modificationTool;                    //which material will be used to create/resize claims with a right click
 
     public ArrayList<String> config_claims_commandsRequiringAccessTrust; //the list of slash commands requiring access trust when in a claim
     public boolean config_claims_supplyPlayerManual;                //whether to give new players a book with land claim help in it
@@ -135,12 +131,6 @@ public class EterniaKamui extends JavaPlugin {
     public boolean config_fireSpreads;                                //whether fire spreads outside of claims
     public boolean config_fireDestroys;                                //whether fire destroys blocks outside of claims
 
-    public boolean config_whisperNotifications;                    //whether whispered messages will broadcast to administrators in game
-    public boolean config_signNotifications;                        //whether sign content will broadcast to administrators in game
-    public ArrayList<String> config_eavesdrop_whisperCommands;        //list of whisper commands to eavesdrop on
-
-    public boolean config_smartBan;                                    //whether to ban accounts which very likely owned by a banned player
-
     public boolean config_endermenMoveBlocks;                        //whether or not endermen may move blocks around
     public boolean config_claims_ravagersBreakBlocks;                //whether or not ravagers may break blocks in claims
     public boolean config_silverfishBreakBlocks;                    //whether silverfish may break blocks
@@ -148,16 +138,11 @@ public class EterniaKamui extends JavaPlugin {
     public boolean config_rabbitsEatCrops;                          //whether or not rabbits may eat crops
     public boolean config_zombiesBreakDoors;                        //whether or not hard-mode zombies may break down wooden doors
 
-    public int config_ipLimit;                                      //how many players can share an IP address
-
-    public boolean config_trollFilterEnabled;                       //whether to auto-mute new players who use banned words right after joining
-
     public HashMap<String, Integer> config_seaLevelOverride;        //override for sea level, because bukkit doesn't report the right value for all situations
 
     public boolean config_limitTreeGrowth;                          //whether trees should be prevented from growing into a claim from outside
     public PistonMode config_pistonMovement;
 
-    public boolean config_advanced_fixNegativeClaimblockAmounts;    //whether to attempt to fix negative claim block amounts (some addons cause/assume players can go into negative amounts)
     public int config_advanced_claim_expiration_check_rate;            //How often GP should check for expired claims, amount in seconds
     public int config_advanced_offlineplayer_cache_days;            //Cache players who have logged in within the last x number of days
 
@@ -167,11 +152,6 @@ public class EterniaKamui extends JavaPlugin {
     public boolean config_logs_suspiciousEnabled;
     public boolean config_logs_adminEnabled;
     public boolean config_logs_debugEnabled;
-    public boolean config_logs_mutedChatEnabled;
-
-    //ban management plugin interop settings
-    public boolean config_ban_useCommand;
-    public String config_ban_commandFormat;
 
     public static String getString(Strings entry) {
         return strings[entry.ordinal()];
@@ -187,6 +167,10 @@ public class EterniaKamui extends JavaPlugin {
 
     public static double getDouble(Doubles entry) {
         return doubles[entry.ordinal()];
+    }
+
+    public static Material getMaterials(Materials entry) {
+        return materials[entry.ordinal()];
     }
 
     public static ClaimsMode getClaimsWorldModes(World world) {
@@ -232,9 +216,9 @@ public class EterniaKamui extends JavaPlugin {
 
         new ErrorsCfg();
 
-        ConfigsCfg configsCfg = new ConfigsCfg(strings, booleans, integers, doubles);
+        ConfigsCfg configsCfg = new ConfigsCfg(strings, booleans, integers, doubles, materials);
         configsCfg.loadWorldClaimsModeMap(claimsWorldModes, booleans);
-        configsCfg.saveOutConfiguration();
+        configsCfg.saveConfiguration();
 
         new MessagesCfg(messages);
 
@@ -348,12 +332,6 @@ public class EterniaKamui extends JavaPlugin {
             this.config_seaLevelOverride.put(element.getName(), seaLevelOverride);
         }
 
-        this.config_claims_chestClaimExpirationDays = config.getInt("GriefPrevention.Claims.Expiration.ChestClaimDays", 7);
-        this.config_claims_unusedClaimExpirationDays = config.getInt("GriefPrevention.Claims.Expiration.UnusedClaimDays", 14);
-
-        this.config_claims_survivalAutoNatureRestoration = config.getBoolean("GriefPrevention.Claims.Expiration.AutomaticNatureRestoration.SurvivalWorlds", false);
-        this.config_claims_allowTrappedInAdminClaims = config.getBoolean("GriefPrevention.Claims.AllowTrappedInAdminClaims", false);
-
         String accessTrustSlashCommands = config.getString("GriefPrevention.Claims.CommandsRequiringAccessTrust", "/sethome");
         this.config_claims_supplyPlayerManual = config.getBoolean("GriefPrevention.Claims.DeliverManuals", true);
         this.config_claims_manualDeliveryDelaySeconds = config.getInt("GriefPrevention.Claims.ManualDeliveryDelaySeconds", 30);
@@ -393,48 +371,11 @@ public class EterniaKamui extends JavaPlugin {
         this.config_fireSpreads = config.getBoolean("GriefPrevention.FireSpreads", false);
         this.config_fireDestroys = config.getBoolean("GriefPrevention.FireDestroys", false);
 
-        this.config_whisperNotifications = config.getBoolean("GriefPrevention.AdminsGetWhispers", true);
-        this.config_signNotifications = config.getBoolean("GriefPrevention.AdminsGetSignNotifications", true);
-        String whisperCommandsToMonitor = config.getString("GriefPrevention.WhisperCommands", "/tell;/pm;/r;/whisper;/msg");
-        whisperCommandsToMonitor = config.getString("GriefPrevention.Spam.WhisperSlashCommands", whisperCommandsToMonitor);
-
-        this.config_smartBan = config.getBoolean("GriefPrevention.SmartBan", true);
-        this.config_trollFilterEnabled = config.getBoolean("GriefPrevention.Mute New Players Using Banned Words", true);
-        this.config_ipLimit = config.getInt("GriefPrevention.MaxPlayersPerIpAddress", 3);
-
         this.config_endermenMoveBlocks = config.getBoolean("GriefPrevention.EndermenMoveBlocks", false);
         this.config_silverfishBreakBlocks = config.getBoolean("GriefPrevention.SilverfishBreakBlocks", false);
         this.config_creaturesTrampleCrops = config.getBoolean("GriefPrevention.CreaturesTrampleCrops", false);
         this.config_rabbitsEatCrops = config.getBoolean("GriefPrevention.RabbitsEatCrops", true);
         this.config_zombiesBreakDoors = config.getBoolean("GriefPrevention.HardModeZombiesBreakDoors", false);
-        this.config_ban_useCommand = config.getBoolean("GriefPrevention.UseBanCommand", false);
-        this.config_ban_commandFormat = config.getString("GriefPrevention.BanCommandPattern", "ban %name% %reason%");
-
-        //default for claim investigation tool
-        String investigationToolMaterialName = Material.STICK.name();
-
-        //get investigation tool from config
-        investigationToolMaterialName = config.getString("GriefPrevention.Claims.InvestigationTool", investigationToolMaterialName);
-
-        //validate investigation tool
-        this.config_claims_investigationTool = Material.getMaterial(investigationToolMaterialName);
-        if (this.config_claims_investigationTool == null) {
-            EterniaKamui.AddLogEntry("ERROR: Material " + investigationToolMaterialName + " not found.  Defaulting to the stick.  Please update your config.yml.");
-            this.config_claims_investigationTool = Material.STICK;
-        }
-
-        //default for claim creation/modification tool
-        String modificationToolMaterialName = Material.GOLDEN_SHOVEL.name();
-
-        //get modification tool from config
-        modificationToolMaterialName = config.getString("GriefPrevention.Claims.ModificationTool", modificationToolMaterialName);
-
-        //validate modification tool
-        this.config_claims_modificationTool = Material.getMaterial(modificationToolMaterialName);
-        if (this.config_claims_modificationTool == null) {
-            EterniaKamui.AddLogEntry("ERROR: Material " + modificationToolMaterialName + " not found.  Defaulting to the golden shovel.  Please update your config.yml.");
-            this.config_claims_modificationTool = Material.GOLDEN_SHOVEL;
-        }
 
         this.config_pvp_noCombatInPlayerLandClaims = config.getBoolean("GriefPrevention.PvP.ProtectPlayersInLandClaims.PlayerOwnedClaims", true);
         this.config_pvp_noCombatInAdminLandClaims = config.getBoolean("GriefPrevention.PvP.ProtectPlayersInLandClaims.AdministrativeClaims", true);
@@ -445,7 +386,6 @@ public class EterniaKamui extends JavaPlugin {
         this.config_pvp_allowFireNearPlayers_NonPvp = config.getBoolean("GriefPrevention.PvP.AllowFlintAndSteelNearOtherPlayers.NonPvPWorlds", false);
         this.config_pvp_protectPets = config.getBoolean("GriefPrevention.PvP.ProtectPetsOutsideLandClaims", false);
 
-        this.config_advanced_fixNegativeClaimblockAmounts = config.getBoolean("GriefPrevention.Advanced.fixNegativeClaimblockAmounts", true);
         this.config_advanced_claim_expiration_check_rate = config.getInt("GriefPrevention.Advanced.ClaimExpirationCheckRate", 60);
         this.config_advanced_offlineplayer_cache_days = config.getInt("GriefPrevention.Advanced.OfflinePlayer_cache_days", 90);
 
@@ -455,14 +395,7 @@ public class EterniaKamui extends JavaPlugin {
         this.config_logs_suspiciousEnabled = config.getBoolean("GriefPrevention.Abridged Logs.Included Entry Types.Suspicious Activity", true);
         this.config_logs_adminEnabled = config.getBoolean("GriefPrevention.Abridged Logs.Included Entry Types.Administrative Activity", false);
         this.config_logs_debugEnabled = config.getBoolean("GriefPrevention.Abridged Logs.Included Entry Types.Debug", false);
-        this.config_logs_mutedChatEnabled = config.getBoolean("GriefPrevention.Abridged Logs.Included Entry Types.Muted Chat Messages", false);
 
-        outConfig.set("GriefPrevention.Claims.InvestigationTool", this.config_claims_investigationTool.name());
-        outConfig.set("GriefPrevention.Claims.ModificationTool", this.config_claims_modificationTool.name());
-        outConfig.set("GriefPrevention.Claims.Expiration.ChestClaimDays", this.config_claims_chestClaimExpirationDays);
-        outConfig.set("GriefPrevention.Claims.Expiration.UnusedClaimDays", this.config_claims_unusedClaimExpirationDays);
-        outConfig.set("GriefPrevention.Claims.Expiration.AutomaticNatureRestoration.SurvivalWorlds", this.config_claims_survivalAutoNatureRestoration);
-        outConfig.set("GriefPrevention.Claims.AllowTrappedInAdminClaims", this.config_claims_allowTrappedInAdminClaims);
         outConfig.set("GriefPrevention.Claims.CommandsRequiringAccessTrust", accessTrustSlashCommands);
         outConfig.set("GriefPrevention.Claims.DeliverManuals", config_claims_supplyPlayerManual);
         outConfig.set("GriefPrevention.Claims.ManualDeliveryDelaySeconds", config_claims_manualDeliveryDelaySeconds);
@@ -508,23 +441,12 @@ public class EterniaKamui extends JavaPlugin {
         outConfig.set("GriefPrevention.FireSpreads", this.config_fireSpreads);
         outConfig.set("GriefPrevention.FireDestroys", this.config_fireDestroys);
 
-        outConfig.set("GriefPrevention.AdminsGetWhispers", this.config_whisperNotifications);
-        outConfig.set("GriefPrevention.AdminsGetSignNotifications", this.config_signNotifications);
-
-        outConfig.set("GriefPrevention.SmartBan", this.config_smartBan);
-        outConfig.set("GriefPrevention.Mute New Players Using Banned Words", this.config_trollFilterEnabled);
-        outConfig.set("GriefPrevention.MaxPlayersPerIpAddress", this.config_ipLimit);
-
         outConfig.set("GriefPrevention.EndermenMoveBlocks", this.config_endermenMoveBlocks);
         outConfig.set("GriefPrevention.SilverfishBreakBlocks", this.config_silverfishBreakBlocks);
         outConfig.set("GriefPrevention.CreaturesTrampleCrops", this.config_creaturesTrampleCrops);
         outConfig.set("GriefPrevention.RabbitsEatCrops", this.config_rabbitsEatCrops);
         outConfig.set("GriefPrevention.HardModeZombiesBreakDoors", this.config_zombiesBreakDoors);
 
-        outConfig.set("GriefPrevention.UseBanCommand", this.config_ban_useCommand);
-        outConfig.set("GriefPrevention.BanCommandPattern", this.config_ban_commandFormat);
-
-        outConfig.set("GriefPrevention.Advanced.fixNegativeClaimblockAmounts", this.config_advanced_fixNegativeClaimblockAmounts);
         outConfig.set("GriefPrevention.Advanced.ClaimExpirationCheckRate", this.config_advanced_claim_expiration_check_rate);
         outConfig.set("GriefPrevention.Advanced.OfflinePlayer_cache_days", this.config_advanced_offlineplayer_cache_days);
 
@@ -534,7 +456,6 @@ public class EterniaKamui extends JavaPlugin {
         outConfig.set("GriefPrevention.Abridged Logs.Included Entry Types.Suspicious Activity", this.config_logs_suspiciousEnabled);
         outConfig.set("GriefPrevention.Abridged Logs.Included Entry Types.Administrative Activity", this.config_logs_adminEnabled);
         outConfig.set("GriefPrevention.Abridged Logs.Included Entry Types.Debug", this.config_logs_debugEnabled);
-        outConfig.set("GriefPrevention.Abridged Logs.Included Entry Types.Muted Chat Messages", this.config_logs_mutedChatEnabled);
 
         try {
             outConfig.save(DataStore.configFilePath);
@@ -549,13 +470,6 @@ public class EterniaKamui extends JavaPlugin {
             if (!item.isEmpty()) {
                 this.config_claims_commandsRequiringAccessTrust.add(item.trim().toLowerCase());
             }
-        }
-
-        //try to parse the list of commands which should be included in eavesdropping
-        this.config_eavesdrop_whisperCommands = new ArrayList<>();
-        commands = whisperCommandsToMonitor.split(";");
-        for (String s : commands) {
-            this.config_eavesdrop_whisperCommands.add(s.trim().toLowerCase());
         }
 
         //try to parse the list of commands which should be banned during pvp combat
@@ -598,7 +512,7 @@ public class EterniaKamui extends JavaPlugin {
             //if player has any claims, respect claim minimum size setting
             if (playerData.getClaims().size() > 0) {
                 //if player has exactly one land claim, this requires the claim modification tool to be in hand (or creative mode player)
-                if (playerData.getClaims().size() == 1 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool) {
+                if (playerData.getClaims().size() == 1 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.getMaterials(Materials.MODIFICATION_TOOL)) {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
                     return true;
                 }
@@ -608,7 +522,7 @@ public class EterniaKamui extends JavaPlugin {
 
             //allow for specifying the radius
             if (args.length > 0) {
-                if (playerData.getClaims().size() < 2 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool) {
+                if (playerData.getClaims().size() < 2 && player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.getMaterials(Materials.MODIFICATION_TOOL)) {
                     EterniaKamui.sendMessage(player, TextMode.Err, Messages.RadiusRequiresGoldenShovel);
                     return true;
                 }
@@ -699,7 +613,7 @@ public class EterniaKamui extends JavaPlugin {
             }
 
             //requires claim modification tool in hand
-            if (player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.instance.config_claims_modificationTool) {
+            if (player.getGameMode() != GameMode.CREATIVE && player.getItemInHand().getType() != EterniaKamui.getMaterials(Materials.MODIFICATION_TOOL)) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.MustHoldModificationToolForThat);
                 return true;
             }
@@ -966,7 +880,7 @@ public class EterniaKamui extends JavaPlugin {
             EterniaKamui.sendMessage(player, TextMode.Info, Messages.TrustListHeader);
 
             StringBuilder permissions = new StringBuilder();
-            permissions.append(ChatColor.GOLD + ">");
+            permissions.append(ChatColor.GOLD).append(">");
 
             if (managers.size() > 0) {
                 for (String manager : managers) permissions.append(this.trustEntryToPlayerName(manager)).append(" ");
@@ -974,7 +888,7 @@ public class EterniaKamui extends JavaPlugin {
 
             player.sendMessage(permissions.toString());
             permissions = new StringBuilder();
-            permissions.append(ChatColor.YELLOW + ">");
+            permissions.append(ChatColor.YELLOW).append(">");
 
             if (builders.size() > 0) {
                 for (String builder : builders) permissions.append(this.trustEntryToPlayerName(builder)).append(" ");
@@ -982,7 +896,7 @@ public class EterniaKamui extends JavaPlugin {
 
             player.sendMessage(permissions.toString());
             permissions = new StringBuilder();
-            permissions.append(ChatColor.GREEN + ">");
+            permissions.append(ChatColor.GREEN).append(">");
 
             if (containers.size() > 0) {
                 for (String container : containers)
@@ -991,7 +905,7 @@ public class EterniaKamui extends JavaPlugin {
 
             player.sendMessage(permissions.toString());
             permissions = new StringBuilder();
-            permissions.append(ChatColor.BLUE + ">");
+            permissions.append(ChatColor.BLUE).append(">");
 
             if (accessors.size() > 0) {
                 for (String accessor : accessors) permissions.append(this.trustEntryToPlayerName(accessor)).append(" ");
@@ -1408,7 +1322,7 @@ public class EterniaKamui extends JavaPlugin {
                         this.dataStore.deleteClaim(claim, true, true);
 
                         //if in a creative mode world, /restorenature the claim
-                        if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()) || EterniaKamui.instance.config_claims_survivalAutoNatureRestoration) {
+                        if (EterniaKamui.instance.creativeRulesApply(claim.getLesserBoundaryCorner()) || EterniaKamui.getBool(Booleans.CLAIMS_SURVIVAL_AUTO_NATURE_RESTORATION)) {
                             EterniaKamui.instance.restoreClaim(claim, 0);
                         }
 
@@ -1798,7 +1712,7 @@ public class EterniaKamui extends JavaPlugin {
             }
 
             //if the player is in an administrative claim and AllowTrappedInAdminClaims is false, he should contact an admin
-            if (!EterniaKamui.instance.config_claims_allowTrappedInAdminClaims && claim.isAdminClaim() && event.getDestination() == null) {
+            if (!EterniaKamui.getBool(Booleans.CLAIMS_ALLOW_TRAPPED_IN_ADMINCLAIMS) && claim.isAdminClaim() && event.getDestination() == null) {
                 EterniaKamui.sendMessage(player, TextMode.Err, Messages.TrappedWontWorkHere);
                 return true;
             }
@@ -2261,7 +2175,7 @@ public class EterniaKamui extends JavaPlugin {
     }
 
     //helper method to resolve a player name from the player's UUID
-    static String lookupPlayerName(UUID playerID) {
+    public static String lookupPlayerName(UUID playerID) {
         //parameter validation
         if (playerID == null) return "somebody";
 
@@ -2275,7 +2189,7 @@ public class EterniaKamui extends JavaPlugin {
     }
 
     //cache for player name lookups, to save searches of all offline players
-    static void cacheUUIDNamePair(UUID playerID, String playerName) {
+    public static void cacheUUIDNamePair(UUID playerID, String playerName) {
         //store the reverse mapping
         EterniaKamui.instance.playerNameToIDMap.put(playerName, playerID);
         EterniaKamui.instance.playerNameToIDMap.put(playerName.toLowerCase(), playerID);
@@ -2434,14 +2348,10 @@ public class EterniaKamui extends JavaPlugin {
     }
 
     //determines whether creative anti-grief rules apply at a location
-    boolean creativeRulesApply(Location location) {
+    public boolean creativeRulesApply(Location location) {
         if (!getBool(Booleans.CREATIVE_WORLD_EXIST)) return false;
 
         return claimsWorldModes.get((location.getWorld())) == ClaimsMode.Creative;
-    }
-
-    public String allowBuild(Player player, Location location) {
-        return this.allowBuild(player, location, location.getBlock().getType());
     }
 
     public String allowBuild(Player player, Location location, Material material) {
@@ -2631,22 +2541,6 @@ public class EterniaKamui extends JavaPlugin {
 
         PlayerData playerData = instance.dataStore.getPlayerData(player.getUniqueId());
         return playerData.getClaims().size() <= 0;
-    }
-
-    static void banPlayer(Player player, String reason, String source) {
-        if (EterniaKamui.instance.config_ban_useCommand) {
-            Bukkit.getServer().dispatchCommand(
-                    Bukkit.getConsoleSender(),
-                    EterniaKamui.instance.config_ban_commandFormat.replace("%name%", player.getName()).replace("%reason%", reason));
-        } else {
-            BanList bans = Bukkit.getServer().getBanList(Type.NAME);
-            bans.addBan(player.getName(), reason, null, source);
-
-            //kick
-            if (player.isOnline()) {
-                player.kickPlayer(reason);
-            }
-        }
     }
 
     public ItemStack getItemInHand(Player player, EquipmentSlot hand) {

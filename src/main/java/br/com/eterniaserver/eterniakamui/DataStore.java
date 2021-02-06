@@ -22,14 +22,12 @@ import br.com.eterniaserver.eterniakamui.enums.*;
 import br.com.eterniaserver.eternialib.UUIDFetcher;
 import br.com.eterniaserver.eterniakamui.events.ClaimCreatedEvent;
 import br.com.eterniaserver.eterniakamui.events.ClaimDeletedEvent;
-import br.com.eterniaserver.eterniakamui.events.ClaimExtendEvent;
 import br.com.eterniaserver.eterniakamui.events.ClaimModifiedEvent;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.AnimalTamer;
@@ -37,14 +35,11 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Tameable;
 import org.bukkit.inventory.InventoryHolder;
-import org.bukkit.inventory.ItemStack;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -52,7 +47,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 
 
 //singleton class which manages all GriefPrevention data (except for config options)
@@ -65,14 +59,11 @@ public abstract class DataStore {
     protected final ConcurrentHashMap<String, Integer> permissionToBonusBlocksMap = new ConcurrentHashMap<>();
 
     //in-memory cache for claim data
-    protected final ArrayList<Claim> claims = new ArrayList<>();
-    final ConcurrentHashMap<Long, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<>();
+    public final ArrayList<Claim> claims = new ArrayList<>();
+    public final ConcurrentHashMap<Long, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<>();
 
     //in-memory cache for messages
     private String[] messages;
-
-    //pattern for unique user identifiers (UUIDs)
-    protected final static Pattern uuidpattern = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
 
     //next claim ID
     Long nextClaimID = (long) 0;
@@ -94,9 +85,9 @@ public abstract class DataStore {
     private int currentSchemaVersion = -1;  //-1 means not determined yet
 
     //video links
-    static final String SURVIVAL_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpuser" + ChatColor.RESET;
-    static final String CREATIVE_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpcrea" + ChatColor.RESET;
-    static final String SUBDIVISION_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpsub" + ChatColor.RESET;
+    public static final String SURVIVAL_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpuser" + ChatColor.RESET;
+    public static final String CREATIVE_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpcrea" + ChatColor.RESET;
+    public static final String SUBDIVISION_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpsub" + ChatColor.RESET;
 
     //world guard reference, if available
     private WorldGuardWrapper worldGuard = null;
@@ -156,7 +147,7 @@ public abstract class DataStore {
     }
 
     //removes cached player data from memory
-    synchronized void clearCachedPlayerData(UUID playerID) {
+    public synchronized void clearCachedPlayerData(UUID playerID) {
         this.playerNameToPlayerDataMap.remove(playerID);
     }
 
@@ -737,7 +728,7 @@ public abstract class DataStore {
         return result;
     }
 
-    void resizeClaimWithChecks(Player player, PlayerData playerData, int newx1, int newx2, int newz1, int newz2) {
+    public void resizeClaimWithChecks(Player player, PlayerData playerData, int newx1, int newx2, int newz1, int newz2) {
         //for top level claims, apply size rules and claim blocks requirement
         if (playerData.claimResizing.parent == null) {
             //measure new claim, apply size rules
@@ -861,7 +852,7 @@ public abstract class DataStore {
     }
 
     //educates a player about /adminclaims and /acb, if he can use them 
-    void tryAdvertiseAdminAlternatives(Player player) {
+    public void tryAdvertiseAdminAlternatives(Player player) {
         if (player.hasPermission("griefprevention.adminclaims") && player.hasPermission("griefprevention.adjustclaimblocks")) {
             EterniaKamui.sendMessage(player, TextMode.Info, Messages.AdvertiseACandACB);
         } else if (player.hasPermission("griefprevention.adminclaims")) {
@@ -921,7 +912,7 @@ public abstract class DataStore {
     }
 
     //gets all the claims "near" a location
-    Set<Claim> getNearbyClaims(Location location) {
+    public Set<Claim> getNearbyClaims(Location location) {
         Set<Claim> claims = new HashSet<>();
 
         Chunk lesserChunk = location.getWorld().getChunkAt(location.subtract(150, 0, 150));

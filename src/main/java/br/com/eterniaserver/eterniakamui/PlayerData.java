@@ -55,7 +55,7 @@ public class PlayerData {
     public ShovelMode shovelMode = ShovelMode.Basic;
 
     //radius for restore nature fill mode
-    int fillRadius = 0;
+    public int fillRadius = 0;
 
     //last place the player used the shovel, useful in creating and resizing claims,
     //because the player must use the shovel twice in those instances
@@ -71,13 +71,13 @@ public class PlayerData {
     public boolean pendingTrapped = false;
 
     //whether this player was recently warned about building outside land claims
-    boolean warnedAboutBuildingOutsideClaims = false;
+    public boolean warnedAboutBuildingOutsideClaims = false;
 
     //timestamp when last siege ended (where this player was the defender)
     long lastSiegeEndTimeStamp = 0;
 
     //whether the player was kicked (set and used during logout)
-    boolean wasKicked = false;
+    public boolean wasKicked = false;
 
     //visualization
     public Visualization currentVisualization = null;
@@ -102,23 +102,23 @@ public class PlayerData {
     public InetAddress ipAddress;
 
     //whether or not this player has received a message about unlocking death drops since his last death
-    boolean receivedDropUnlockAdvertisement = false;
+    public boolean receivedDropUnlockAdvertisement = false;
 
     //whether or not this player's dropped items (on death) are unlocked for other players to pick up
-    boolean dropsAreUnlocked = false;
+    public boolean dropsAreUnlocked = false;
 
     //message to send to player after he respawns
-    String messageOnRespawn = null;
+    public String messageOnRespawn = null;
 
     //player which a pet will be given to when it's right-clicked
-    OfflinePlayer petGiveawayRecipient = null;
+    public OfflinePlayer petGiveawayRecipient = null;
 
     //timestamp for last "you're building outside your land claims" message
-    Long buildWarningTimestamp = null;
+    public Long buildWarningTimestamp = null;
 
     //spot where a player can't talk, used to mute new players until they've moved a little
     //this is an anti-bot strategy.
-    Location noChatLocation = null;
+    public Location noChatLocation = null;
 
     //ignore list
     //true means invisible (admin-forced ignore), false means player-created ignore
@@ -136,7 +136,7 @@ public class PlayerData {
 
         long elapsed = now - this.lastPvpTimestamp;
 
-        if (elapsed > EterniaKamui.instance.config_pvp_combatTimeoutSeconds * 1000) //X seconds
+        if (elapsed > EterniaKamui.instance.config_pvp_combatTimeoutSeconds * 1000L) //X seconds
         {
             this.lastPvpTimestamp = 0;
             return false;
@@ -199,17 +199,9 @@ public class PlayerData {
         PlayerData storageData = EterniaKamui.instance.dataStore.getPlayerDataFromStorage(this.playerID);
 
         if (this.accruedClaimBlocks == null) {
-            if (storageData.accruedClaimBlocks != null) {
-                this.accruedClaimBlocks = storageData.accruedClaimBlocks;
-
-                //ensure at least minimum accrued are accrued (in case of settings changes to increase initial amount)
-                if (EterniaKamui.instance.config_advanced_fixNegativeClaimblockAmounts && (this.accruedClaimBlocks < EterniaKamui.getInt(Integers.CLAIMS_INITIAL_BLOCKS))) {
-                    this.accruedClaimBlocks = EterniaKamui.getInt(Integers.CLAIMS_INITIAL_BLOCKS);
-                }
-
-            } else {
-                this.accruedClaimBlocks = EterniaKamui.getInt(Integers.CLAIMS_INITIAL_BLOCKS);
-            }
+            this.accruedClaimBlocks = storageData.accruedClaimBlocks != null ?
+                    storageData.accruedClaimBlocks :
+                    EterniaKamui.getInt(Integers.CLAIMS_INITIAL_BLOCKS);
         }
 
         if (this.bonusClaimBlocks == null) {
@@ -241,7 +233,7 @@ public class PlayerData {
 
             //if total claimed area is more than total blocks available
             int totalBlocks = this.accruedClaimBlocks + this.getBonusClaimBlocks() + EterniaKamui.instance.dataStore.getGroupBonusBlocks(this.playerID);
-            if (EterniaKamui.instance.config_advanced_fixNegativeClaimblockAmounts && totalBlocks < totalClaimsArea) {
+            if (totalBlocks < totalClaimsArea) {
                 OfflinePlayer player = EterniaKamui.instance.getServer().getOfflinePlayer(this.playerID);
                 EterniaKamui.AddLogEntry(player.getName() + " has more claimed land than blocks available.  Adding blocks to fix.", CustomLogEntryTypes.Debug, true);
                 EterniaKamui.AddLogEntry(player.getName() + " Accrued blocks: " + this.getAccruedClaimBlocks() + " Bonus blocks: " + this.getBonusClaimBlocks(), CustomLogEntryTypes.Debug, true);

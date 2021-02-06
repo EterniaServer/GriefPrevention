@@ -30,8 +30,8 @@ import java.util.Map;
 
 public class BaseCmdFlags extends BaseCommand {
 
-    protected static final Map<Integer, ItemStack> guiItensDisable = new HashMap<>();
-    protected static final Map<Integer, ItemStack> guiItensEnable = new HashMap<>();
+    public static final Map<Integer, ItemStack> guiItensDisable = new HashMap<>();
+    public static final Map<Integer, ItemStack> guiItensEnable = new HashMap<>();
 
     public BaseCmdFlags() {
 

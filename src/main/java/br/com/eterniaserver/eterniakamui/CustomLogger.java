@@ -83,8 +83,7 @@ class CustomLogger {
             return false;
         if (entryType == CustomLogEntryTypes.AdminActivity && !EterniaKamui.instance.config_logs_adminEnabled)
             return false;
-        if (entryType == CustomLogEntryTypes.Debug && !EterniaKamui.instance.config_logs_debugEnabled) return false;
-        return entryType != CustomLogEntryTypes.MutedChat || EterniaKamui.instance.config_logs_mutedChatEnabled;
+        return !(entryType == CustomLogEntryTypes.Debug && !EterniaKamui.instance.config_logs_debugEnabled);
     }
 
     void WriteEntries() {
