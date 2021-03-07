@@ -2,50 +2,50 @@ package br.com.eterniaserver.eterniakamui.objects;
 
 public class ClaimFlag {
 
-    private boolean keepLevel = false;
-    private boolean explosions = false;
-    private boolean creatureSpawn = true;
-    private boolean allowPvP = false;
-    private boolean liquidFluid = true;
+    private int keepLevel = 0;
+    private int explosions = 0;
+    private int creatureSpawn = 0;
+    private int allowPvP = 0;
+    private int liquidFluid = 0;
 
     public boolean isKeepLevel() {
-        return keepLevel;
+        return keepLevel == 1;
     }
 
     public boolean isExplosions() {
-        return explosions;
+        return explosions == 1;
     }
 
     public boolean isCreatureSpawn() {
-        return creatureSpawn;
+        return creatureSpawn == 1;
     }
 
     public boolean isAllowPvP() {
-        return allowPvP;
+        return allowPvP == 1;
     }
 
     public boolean isLiquidFluid() {
-        return liquidFluid;
+        return liquidFluid == 1;
     }
 
     public void setKeepLevel(int value) {
-        keepLevel = value == 1;
+        keepLevel = value;
     }
 
     public void setExplosions(int value) {
-        explosions = value == 1;
+        explosions = value;
     }
 
     public void setCreatureSpawn(int value) {
-        creatureSpawn = value == 1;
+        creatureSpawn = value;
     }
 
     public void setAllowPvP(int value) {
-        allowPvP = value == 1;
+        allowPvP = value;
     }
 
     public void setLiquidFluid(int value) {
-        liquidFluid = value == 1;
+        liquidFluid = value;
     }
 
 }

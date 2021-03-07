@@ -1,4 +1,4 @@
-package br.com.eterniaserver.eterniakamui;
+package br.com.eterniaserver.eterniakamui.commands;
 
 import br.com.eterniaserver.acf.BaseCommand;
 import br.com.eterniaserver.acf.CommandHelp;
@@ -10,10 +10,12 @@ import br.com.eterniaserver.acf.annotation.Description;
 import br.com.eterniaserver.acf.annotation.HelpCommand;
 import br.com.eterniaserver.acf.annotation.Subcommand;
 import br.com.eterniaserver.acf.annotation.Syntax;
+import br.com.eterniaserver.eterniakamui.EterniaKamui;
 import br.com.eterniaserver.eterniakamui.enums.Messages;
+import br.com.eterniaserver.eterniakamui.enums.Strings;
 import br.com.eterniaserver.eternialib.SQL;
-import br.com.eterniaserver.eternialib.sql.queries.Delete;
-import br.com.eterniaserver.eternialib.sql.queries.Insert;
+import br.com.eterniaserver.eternialib.core.queries.Delete;
+import br.com.eterniaserver.eternialib.core.queries.Insert;
 import br.com.eterniaserver.paperlib.PaperLib;
 
 import org.bukkit.Bukkit;
@@ -32,17 +34,20 @@ import java.sql.SQLException;
 
 @CommandAlias("mv|multiverse")
 @CommandPermission("eternia.world")
-public class BaseCmdMultiVerse extends BaseCommand {
+public class MultiVerse extends BaseCommand {
 
-    public BaseCmdMultiVerse() {
+    private final EterniaKamui plugin;
+
+    public MultiVerse(final EterniaKamui plugin) {
+        this.plugin = plugin;
 
         try (Connection connection = SQL.getConnection()) {
-            PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM ek_worlds;");
+            PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM " + plugin.getString(Strings.TABLE_WORLDS) + ";");
             preparedStatement.execute();
             ResultSet resultSet = preparedStatement.getResultSet();
             while (resultSet.next()) {
                 final String worldName = resultSet.getString("name").toLowerCase();
-                PluginVars.invClear.put(worldName, resultSet.getInt("invclear"));
+                plugin.invClear.put(worldName, resultSet.getInt("invclear"));
                 createWorld(worldName, resultSet.getString("enviroment").toLowerCase(), resultSet.getString("type").toLowerCase());
             }
             resultSet.close();
@@ -69,18 +74,20 @@ public class BaseCmdMultiVerse extends BaseCommand {
         worldName = worldName.toLowerCase();
         worldEnviroment = worldEnviroment.toLowerCase();
         worldType = worldType.toLowerCase();
-        if (!PluginVars.worlds.contains(worldName)) {
-            createWorld(worldName, worldEnviroment, worldType);
-            EterniaKamui.sendMessage(player, TextMode.Success, Messages.WorldCreated, worldName, worldEnviroment, worldType, String.valueOf(invClear));
-            PluginVars.invClear.put(worldName, invClear);
 
-            Insert insert = new Insert("ek_worlds");
-            insert.columns.set("name", "enviroment", "type", "invclear");
-            insert.values.set(worldName, worldEnviroment, worldType, invClear);
-            SQL.executeAsync(insert);
-        } else {
-            EterniaKamui.sendMessage(player, TextMode.Success, Messages.WorldAlready, worldName);
+        if (plugin.worlds.contains(worldName)) {
+            plugin.sendMessage(player, Messages.WORLD_EXISTS, worldName);
         }
+
+        createWorld(worldName, worldEnviroment, worldType);
+        plugin.invClear.put(worldName, invClear);
+
+        final Insert insert = new Insert("ek_worlds");
+        insert.columns.set("name", "enviroment", "type", "invclear");
+        insert.values.set(worldName, worldEnviroment, worldType, invClear);
+        SQL.executeAsync(insert);
+
+        plugin.sendMessage(player, Messages.WORLD_CREATED, worldName);
     }
 
     @Subcommand("remove")
@@ -93,7 +100,7 @@ public class BaseCmdMultiVerse extends BaseCommand {
         if (removeWorld(player, worldName)) return;
 
         Bukkit.getServer().unloadWorld(worldName, true);
-        EterniaKamui.sendMessage(player, TextMode.Success, Messages.WorldRemoved, worldName);
+        plugin.sendMessage(player, Messages.WORLD_REMOVED, worldName);
     }
 
     @Subcommand("delete")
@@ -108,23 +115,24 @@ public class BaseCmdMultiVerse extends BaseCommand {
         Bukkit.getServer().unloadWorld(worldName, true);
         deleteDir(new File("." + File.separator + worldName));
 
-        Delete delete = new Delete("ek_worlds");
+        final Delete delete = new Delete("ek_worlds");
         delete.where.set("name", worldName);
         SQL.executeAsync(delete);
 
-        EterniaKamui.sendMessage(player, TextMode.Success, Messages.WorldRemoved, worldName);
+        plugin.sendMessage(player, Messages.WORLD_DELETED, worldName);
     }
 
     public boolean removeWorld(Player player, String worldName) {
-        if (PluginVars.baseWorlds.contains(worldName)) {
-            EterniaKamui.sendMessage(player, TextMode.Err, Messages.WorldBase);
+        if (plugin.baseWorlds.contains(worldName)) {
+            plugin.sendMessage(player, Messages.WORLD_BASE);
             return true;
         }
 
-        if (!PluginVars.worlds.contains(worldName)) {
-            EterniaKamui.sendMessage(player, TextMode.Err, Messages.WorldNoExists);
+        if (!plugin.worlds.contains(worldName)) {
+            plugin.sendMessage(player, Messages.WORLD_NOT_FOUND, worldName);
             return true;
         }
+
         return false;
     }
 
@@ -146,8 +154,8 @@ public class BaseCmdMultiVerse extends BaseCommand {
     @Description(" Teleporta-se até um mundo")
     public void onTp(Player player, Double x, Double y, Double z, String worldName) {
         worldName = worldName.toLowerCase();
-        if (!PluginVars.worlds.contains(worldName)) {
-            EterniaKamui.sendMessage(player, TextMode.Err, Messages.WorldNoExists);
+        if (!plugin.worlds.contains(worldName)) {
+            plugin.sendMessage(player, Messages.WORLD_NOT_FOUND, worldName);
             return;
         }
 
@@ -158,7 +166,7 @@ public class BaseCmdMultiVerse extends BaseCommand {
         WorldCreator worldCreator = WorldCreator.name(worldName);
         worldCreator.environment(getEnv(worldEnviroment));
         Bukkit.createWorld(getType(worldCreator, worldType));
-        PluginVars.worlds.add(worldName);
+        plugin.worlds.add(worldName);
     }
 
     private WorldCreator getType(WorldCreator worldCreator, String type) {
